@@ -1,8 +1,25 @@
 # Opintodashboard
 
-Yhden sivun dashboard kaikkien tämän syksyn kurssien deadlineista.
-Ajetaan pienellä paikallisella Node-palvelimella (localhost), ei muita
-asennuksia.
+Paikallinen opintodashboard SAMKin Moodlelle. Kokoaa kaikkien kurssiesi
+deadlinet, tentit ja labrat yhteen paikkaan ja auttaa suunnittelemaan,
+milloin kuhunkin tehtävään pitää tarttua. Kaikki toimii omalla koneellasi
+pienellä Node.js-palvelimella: ei tiliä, ei pilvipalvelua eikä
+npm-asennuksia.
+
+**Ominaisuudet**
+
+- **Dashboard:** tulevat deadlinet tiloineen (Avoin, Työn alla, Tehty,
+  Ei tehdä), tuntiarviot ja laskettu "aloita viimeistään" -päivä.
+- **Kalenteri:** kuukausinäkymä työskentelyjaksoista ja EXAM-tenttien
+  varausikkunoista.
+- **Viikko:** jakaa tehtävien tunnit päiville oman opiskeluaikasi mukaan.
+- **Kurssisivut:** kurssin tehtävät, tenttitiedot ja Moodlesta haettu
+  sisältö.
+- **Hae Moodlesta:** uudet kurssit ja tehtävät löytyvät automaattisesti.
+- **Vie Googleen** (valinnainen): deadlinet Google-kalenteriin ja
+  Google Tasksiin.
+- **DeepSeek-tuntiarviot** (valinnainen): automaattinen aika-arvio uusille
+  tehtäville.
 
 ![Dashboard](images/Dashboard.jpg)
 
