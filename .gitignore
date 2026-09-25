@@ -27,6 +27,7 @@ data.json.bak
 *.bak
 # Moodle-skannausten välimuistit (omat tehtävänannot ja kuvaukset)
 deadline_scan.json
+sync_report.json
 
 # --- Debug-dumpit ------------------------------------------------------------
 # Tallennettuja Moodle-sivuja: sisältävät nimen, kurssit ja istuntotietoja.

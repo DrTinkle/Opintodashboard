@@ -3934,10 +3934,61 @@
     );
   }
 
+  const SYNC_LAST_RESULT_KEY = "opintodashboard_last_sync_result_v1";
+
+  // Kuvaa synkan tuloksen niin, että "ei uutta" erottuu tilanteesta, jossa
+  // mitään ei oikeasti tarkistettu: kertoo montako kurssia ja tehtävää
+  // Moodlesta käytiin läpi ja montako määräaikaa löytyi. Kurssikohtainen
+  // erittely näkyy tilatekstin päällä hiirellä (title).
+  function describeSync(s) {
+    const courses = s.coursesScanned || 0;
+    const news = [];
+    if (s.newCourses && s.newCourses.length) news.push(s.newCourses.length + " uutta kurssia");
+    if (s.newTasks && s.newTasks.length) news.push(s.newTasks.length + " uutta tehtävää");
+    if (s.catalogFilled && s.catalogFilled.length) news.push(s.catalogFilled.length + " kurssin tiedot täydennetty");
+    let text;
+    let isError = false;
+    if (!courses) {
+      text = "Yhtään kurssia ei voitu tarkistaa";
+      isError = true;
+    } else {
+      text =
+        courses + " kurssia ja " + (s.activitiesScanned || 0) + " tehtävää tarkistettu, " +
+        (s.dueFound || 0) + " määräaikaa löytyi" +
+        (news.length ? ": " + news.join(", ") : ", kaikki jo listalla");
+    }
+    const errors = s.errors || [];
+    if (errors.length) {
+      text += " (" + errors.length + " virhettä)";
+      isError = true;
+    }
+    const lines = (s.courses || []).map(
+      (c) =>
+        c.name + ": " + c.activities + " tehtävää, " + c.withDue + " määräaikaa, " + c.known + " jo listalla" +
+        (c.added ? ", " + c.added + " uutta" : "") + (c.error ? " (virhe: " + c.error + ")" : "")
+    );
+    if (errors.length) lines.push("", "Virheet:", ...errors);
+    return { text, isError, tooltip: lines.join("\n") };
+  }
+
+  function showSyncResult(result, prefix) {
+    const statusEl = document.getElementById("syncStatus");
+    statusEl.textContent = (prefix || "") + result.text + ".";
+    statusEl.title = result.tooltip || "";
+    statusEl.className = "sync-status " + (result.isError ? "sync-error" : "sync-ok");
+  }
+
   (function showLastSyncTime() {
     let iso = null;
-    try { iso = localStorage.getItem(SYNC_LAST_RUN_KEY); } catch (e) {}
-    if (iso) {
+    let last = null;
+    try {
+      iso = localStorage.getItem(SYNC_LAST_RUN_KEY);
+      last = JSON.parse(localStorage.getItem(SYNC_LAST_RESULT_KEY) || "null");
+    } catch (e) {}
+    if (iso && last) {
+      showSyncResult(last, "Viimeksi haettu " + formatSyncTimestamp(iso) + ": ");
+      document.getElementById("syncStatus").className = "sync-status" + (last.isError ? " sync-error" : "");
+    } else if (iso) {
       document.getElementById("syncStatus").textContent = "Viimeksi haettu " + formatSyncTimestamp(iso);
     }
   })();
@@ -3957,11 +4008,9 @@
       const s = body.summary;
       try { localStorage.setItem(SYNC_LAST_RUN_KEY, new Date().toISOString()); } catch (e) {}
 
-      const parts = [s.newCourses.length + " uutta kurssia", s.newTasks.length + " uutta tehtävää"];
-      if (s.catalogFilled && s.catalogFilled.length) parts.push(s.catalogFilled.length + " kurssin tiedot täydennetty");
-      if (s.errors && s.errors.length) parts.push(s.errors.length + " virhettä");
-      statusEl.textContent = parts.join(", ") + ".";
-      statusEl.className = "sync-status " + (s.errors && s.errors.length ? "sync-error" : "sync-ok");
+      const result = describeSync(s);
+      try { localStorage.setItem(SYNC_LAST_RESULT_KEY, JSON.stringify(result)); } catch (e) {}
+      showSyncResult(result);
 
       if (s.changed) {
         let detail = "";

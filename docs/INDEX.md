@@ -69,8 +69,8 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data.json ──(build.js)─�
 | `.env.example` | Asetuspohja, josta `setup.js` luo `.env`:n |
 
 Generoidut ja henkilökohtaiset tiedostot (`data.json`, `data.js`, `.env`,
-`token.json`, `sync_state.json`, `credentials.json`, `deadline_scan.json`,
-`debug_*.html`) ovat `.gitignore`:ssa.
+`token.json`, `sync_state.json`, `sync_report.json`, `credentials.json`,
+`deadline_scan.json`, `debug_*.html`) ovat `.gitignore`:ssa.
 
 ## Tietomalli: data.json
 
@@ -244,6 +244,12 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - **Duplikaatit:** otsikot verrataan merkitsevien sanojen perusteella
   (`isSameDeadline()`); pelkät numerot säilytetään aina, jotta
   "Viikkotehtävä 1" ja "Viikkotehtävä 2" eivät sekoitu.
+- **Synkan raportti:** "Hae Moodlesta" kertoo, montako kurssia ja tehtävää
+  tarkistettiin ja montako määräaikaa Moodlesta löytyi (joista jo listalla /
+  uusia). Kurssikohtainen erittely näkyy tilatekstin päällä hiirellä, ja
+  koko raportti (jokainen löydetty tehtävä ja mihin se täsmättiin)
+  tallentuu tiedostoon `sync_report.json`. Jos yhtään kurssia ei voitu
+  tarkistaa, tila näytetään virheenä eikä "ei uutta" -tuloksena.
 - **Roskakurssit:** esim. "Library Moodle" näkyy profiilin kurssilistassa;
   piilota se kurssikortista.
 

@@ -49,6 +49,9 @@ const { estimateWithDeepSeek } = require("./estimate_deepseek.js");
 
 const DATA_JSON_PATH = path.join(__dirname, "data.json");
 const BUILD_JS_PATH = path.join(__dirname, "build.js");
+// Viimeisimmän synkan yksityiskohtainen raportti (mitä Moodlesta löytyi ja
+// mihin se täsmättiin). Ei jaeta: sisältää omien tehtävien nimet.
+const REPORT_PATH = path.join(__dirname, "sync_report.json");
 // Oma Moodle-käyttäjä-id luetaan .env:n MOODLE_USERID-kentästä (Asetukset-
 // välilehti) kutsuhetkellä, jotta Asetuksissa tehty muutos on heti voimassa.
 // Ei oletusarvoa, koska id on jokaisella eri.
@@ -115,9 +118,8 @@ function parseDueDate(activityDatesText) {
 }
 
 // Sama periaate kuin update_from_moodle.js:n isSameDeadline/significantWords
-// (kopioitu tanne pienena, itsenaisena versiona, koska update_from_moodle.js
-// ei ole turvallinen requirettaa - se ajaa oman main()-funktionsa heti
-// tiedoston latautuessa eika odota require.main-tarkistusta).
+// (kopioitu tanne pienena, itsenaisena versiona, jotta synkka ei riipu
+// ICS-tuontiskriptista).
 const GENERIC_WORDS = new Set([
   "on", "ja", "tai", "ei", "jos", "niin", "että", "joka", "jotka", "tästä",
   "tämä", "sen", "kuin", "yhtenä", "sekä", "sitä", "voi", "vielä", "kaikki",
@@ -258,10 +260,15 @@ async function discoverAndAddNewCourses(data, session, baseUrl, opts) {
 // selva "Due:"-paivamaara. Mutatoi course-oliota suoraan ja tayttaa
 // summary-oliota.
 async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary) {
+  // Kurssikohtainen tilasto, jotta "0 uutta" voidaan erottaa tilanteesta,
+  // jossa mitään ei oikeasti tarkistettu.
+  const stat = { id: course.id, name: course.name, activities: 0, withDue: 0, known: 0, added: 0, items: [] };
+  summary.courses.push(stat);
   let baseHtml;
   try {
     baseHtml = await fetchMoodlePage(`${baseUrl}/course/view.php?id=${course.moodleId}`, session);
   } catch (err) {
+    stat.error = err.message;
     summary.errors.push(`[${course.id}] kurssisivun haku epäonnistui: ${err.message}`);
     return;
   }
@@ -270,6 +277,7 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
   try {
     topics = await scrapeCourseTopics(course, baseHtml, session, baseUrl, { debug: false, delay: opts.delay });
   } catch (err) {
+    stat.error = err.message;
     summary.errors.push(`[${course.id}] sisällön jäsennys epäonnistui: ${err.message}`);
     return;
   }
@@ -282,6 +290,7 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
     for (const item of topic.items || []) {
       if (!SCANNABLE_TYPES.has(item.type) || !item.url) continue;
       summary.activitiesScanned++;
+      stat.activities++;
 
       let html;
       try {
@@ -293,12 +302,23 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
       await sleep(opts.delay);
 
       const isoDate = parseDueDate(extractActivityDates(html));
-      if (!isoDate) continue; // ei selvaa maaraaikaa, jatetaan kasin tarkistettavaksi
+      if (!isoDate) {
+        // ei selvaa maaraaikaa, jatetaan kasin tarkistettavaksi
+        stat.items.push({ title: item.title, date: null, status: "no-due" });
+        continue;
+      }
+      stat.withDue++;
+      summary.dueFound++;
 
-      const alreadyExists = course.deadlines.some(
+      const match = course.deadlines.find(
         (d) => d.date === isoDate && isSameDeadline(d.title, item.title)
       );
-      if (alreadyExists) continue;
+      if (match) {
+        stat.known++;
+        summary.alreadyKnown++;
+        stat.items.push({ title: item.title, date: isoDate, status: "known", matchedTo: match.title });
+        continue;
+      }
 
       const introText = extractIntroDescription(html);
       const newDeadline = {
@@ -318,6 +338,8 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
         newDeadline.estimatedPace = estimate.estimatedPace;
       }
       course.deadlines.push(newDeadline);
+      stat.added++;
+      stat.items.push({ title: item.title, date: isoDate, status: "new" });
       summary.newTasks.push({
         course: course.id,
         courseName: course.name,
@@ -335,6 +357,9 @@ async function runSync(opts = {}) {
     newTasks: [],
     coursesScanned: 0,
     activitiesScanned: 0,
+    dueFound: 0,
+    alreadyKnown: 0,
+    courses: [],
     errors: [],
     changed: false,
   };
@@ -386,6 +411,16 @@ async function runSync(opts = {}) {
     execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
   }
 
+  try {
+    fs.writeFileSync(
+      REPORT_PATH,
+      JSON.stringify({ finishedAt: new Date().toISOString(), ...summary }, null, 2) + "\n",
+      "utf8"
+    );
+  } catch (err) {
+    // Raportti on vain apuväline, sen kirjoitus ei saa kaataa synkkaa.
+  }
+
   return summary;
 }
 
@@ -414,6 +449,14 @@ if (require.main === module) {
       console.log(`Uusia tehtäviä: ${summary.newTasks.length}`);
       summary.newTasks.forEach((t) => console.log(`  + [${t.course}] ${t.title} (${t.date})`));
       console.log(`Kursseja skannattu: ${summary.coursesScanned}, aktiviteetteja tarkistettu: ${summary.activitiesScanned}`);
+      console.log(`Määräaikoja Moodlessa: ${summary.dueFound}, joista jo listalla: ${summary.alreadyKnown}`);
+      summary.courses.forEach((c) =>
+        console.log(
+          `  ${c.name}: ${c.activities} tehtävää, ${c.withDue} määräaikaa, ${c.known} jo listalla, ${c.added} uutta` +
+            (c.error ? ` (VIRHE: ${c.error})` : "")
+        )
+      );
+      console.log("Yksityiskohdat: sync_report.json");
       if (summary.errors.length) {
         console.log(`\nVirheitä (${summary.errors.length}):`);
         summary.errors.forEach((e) => console.log("  ! " + e));
