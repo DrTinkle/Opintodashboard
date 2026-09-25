@@ -185,7 +185,7 @@ näkyy heti uudelleenlatauksella.
 | --- | --- |
 | `MOODLE_USERNAME`, `MOODLE_PASSWORD` | Automaattinen kirjautuminen (`refresh_moodle_session.js`) |
 | `MOODLE_SESSION` | Moodlen istuntoeväste; uusitaan automaattisesti, jos tunnukset on asetettu |
-| `MOODLE_USERID` | Oma käyttäjä-id, tarvitaan profiilisivun kurssilistaan |
+| `MOODLE_USERID` | Valinnainen: oma käyttäjä-id. Ilman sitä haetaan kirjautuneen käyttäjän oma profiili |
 | `SAMK_GROUP` | Ryhmätunnus (esim. `AIC25SP`), opinto-oppaan toteutuksen valintaan |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth -asiakas |
 | `DEEPSEEK_API_KEY` | Valinnainen tuntiarvioihin |
@@ -250,11 +250,18 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - **Kurssien sisältö:** SAMKin kursseilla on "tabs"-muoto, jossa jokainen
   aihe on oma sivunsa (`course/view.php?id=X&section=N`). Aiheiden lista
   luetaan välilehtipalkista, piilotetut aiheet ohitetaan.
-- **Kurssilista:** profiilisivulta `user/profile.php?id=<userid>&showallcourses=1`
+- **Kurssilista:** omalta profiilisivulta `user/profile.php?showallcourses=1`
+  (ilman id:tä Moodle näyttää kirjautuneen käyttäjän profiilin;
+  `MOODLE_USERID` antaa id:n tarvittaessa, ja id tunnistetaan sivulta
+  varalla, jos kursseja ei löydy)
   (linkit `user/view.php?...&course=<id>`). Kurssit täsmätään nimen
   perusteella sumealla vertailulla.
+- **Kieli:** Moodle näyttää sivut istunnon tai tilin kieliasetuksen mukaan
+  (skripti ei lähetä selaimen kieltä), joten `fetchMoodlePage()` lisää
+  jokaiseen pyyntöön `lang=en`. Näin sivut ovat kaikilla englanniksi, ja
+  jäsennys (päivämäärät, otsikot) toimii samoin kaikille.
 - **Deadlinet:** tehtäväsivun `data-region="activity-dates"` sisältää
-  "Opened:"/"Due:"-rivit englanniksi. Monella quiz-tyyppisellä
+  "Opened:"/"Due:"-rivit. Monella quiz-tyyppisellä
   harjoituksella ei ole muodollista määräaikaa; sellaiset jätetään
   lisäämättä.
 - **ICS-tuonnin kurssitunnistus** (`update_from_moodle.js`, `matchCourse()`)

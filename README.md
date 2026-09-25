@@ -66,9 +66,6 @@ npm-asennuksia.
    - **Moodle-kirjautuminen:** SAMK-käyttäjätunnus ja salasana
      (suositus, kirjautuminen hoituu sen jälkeen automaattisesti), TAI
      pelkkä MoodleSession-eväste selaimen kehittäjätyökaluista.
-   - **Oma Moodle-käyttäjä-id:** numero, jonka näet Moodlessa oman
-     profiilisivusi osoitteesta (`user/profile.php?id=12345`). Tarvitaan
-     uusien kurssien löytämiseen.
    - **Ryhmätunnus** (esim. `AIC25SP`): kurssien opintopisteet,
      päivämäärät ja opettajat haetaan sen avulla SAMKin opinto-oppaasta.
 
@@ -151,11 +148,11 @@ automaattisesti oikeisiin kansioihin.
 - **Hae Moodlesta antaa kirjautumisvirheen:** tarkista tunnukset
   Asetuksista. Jos käytät pelkkää evästettä, se on voinut vanhentua:
   hae uusi.
-- **Uusia kursseja ei löydy:** tarkista, että oma Moodle-käyttäjä-id on
-  asetettu.
+- **Uusia kursseja ei löydy:** tarkista Moodle-kirjautuminen Asetuksista.
 - **"0 uutta" epäilyttää:** tila kertoo, montako kurssia ja määräaikaa
   tarkistettiin. Jos mitään ei voitu tarkistaa, se näkyy punaisena
-  virheenä. Täysi raportti jokaisesta löydetystä tehtävästä on tiedostossa
+  virheenä. Jos tehtäviä löytyi mutta yhdeltäkään ei tunnistettu
+  määräaikaa, tila näkyy keltaisena varoituksena. Täysi raportti jokaisesta löydetystä tehtävästä on tiedostossa
   `data/sync_report.json`.
 - **Kurssin tiedot puuttuvat:** tarkista, että ryhmätunnus on asetettu.
   Opinto-oppaassa ei ole kaikkia opintoja (esim. Library Moodle).

@@ -72,6 +72,6 @@ Valmis! Seuraavaksi:
 
   1. Käynnistä dashboard:   npm start      (tai: node src/server.js)
   2. Selain avautuu osoitteeseen http://localhost:8080
-  3. Avaa Asetukset-välilehti ja täytä Moodle-kirjautuminen sekä oma
-     Moodle-käyttäjä-id, ja paina sitten "Hae Moodlesta".
+  3. Avaa Asetukset-välilehti, täytä Moodle-kirjautuminen ja ryhmätunnus,
+     ja paina sitten "Hae Moodlesta".
 `);

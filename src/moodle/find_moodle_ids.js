@@ -7,7 +7,7 @@
 // katsomassa käsin joka kurssilta.
 //
 // Hakee tähän oman profiilisivusi "kaikki kurssini" -näkymän
-// (user/profile.php?id=<userid>&showallcourses=1), joka listaa kaikki
+// (user/profile.php?showallcourses=1), joka listaa kaikki
 // kurssisi linkkeinä. Tunnistetaan sitten kurssi data.json:issa vertaamalla
 // linkin tekstiä kurssin "name"-kenttään.
 //
@@ -16,11 +16,9 @@
 //   node src/moodle/find_moodle_ids.js --session "..." --userid <oma numero>
 //   node src/moodle/find_moodle_ids.js --session "..." --dry-run
 //
-// Tarvitset oman Moodle-käyttäjä-id:si (numero, näkyy mm. kalenterin
-// ICS-vientilinkin "userid="-parametrista tai omasta profiilisivustasi
-// Moodlessa) joko --userid-lipulla tässä, tai MOODLE_USERID-kenttänä
-// dashboardin Asetukset-sivulla / .env-tiedostossa - ei enää mitään
-// oletusarvoa, koska tämä on jokaiselle oma.
+// Käyttäjä-id:tä ei tarvita: ilman sitä Moodle näyttää kirjautuneen
+// käyttäjän oman profiilin. --userid tai MOODLE_USERID on vain valinnainen
+// ohitus (ks. fetchOwnCourseLinks).
 
 const fs = require("fs");
 const path = require("path");
@@ -84,6 +82,32 @@ function extractCourseLinks(html) {
   return found;
 }
 
+// Oma kurssilista Moodlen profiilisivulta. Ilman id-parametria Moodle näyttää
+// kirjautuneen käyttäjän oman profiilin, joten käyttäjä-id:tä ei tarvita.
+// userid (MOODLE_USERID / --userid) on vain valinnainen ohitus. Jos sivulta ei
+// löydy kursseja, yritetään vielä sivusta tunnistetulla omalla id:llä.
+function detectOwnUserId(html) {
+  const m = String(html || "").match(/"userId"\s*:\s*(\d+)/) || String(html || "").match(/data-userid="(\d+)"/);
+  return m ? Number(m[1]) : null;
+}
+
+async function fetchOwnCourseLinks(baseUrl, session, userid) {
+  const urlFor = (id) =>
+    id ? `${baseUrl}/user/profile.php?id=${id}&showallcourses=1` : `${baseUrl}/user/profile.php?showallcourses=1`;
+  let url = urlFor(userid);
+  let html = await fetchMoodlePage(url, session);
+  let discovered = extractCourseLinks(html);
+  if (!discovered.size && !userid) {
+    const detected = detectOwnUserId(html);
+    if (detected) {
+      url = urlFor(detected);
+      html = await fetchMoodlePage(url, session);
+      discovered = extractCourseLinks(html);
+    }
+  }
+  return { url, html, discovered };
+}
+
 function scoreMatch(course, label) {
   const normLabel = normalize(label);
   const normName = normalize(course.name);
@@ -121,27 +145,16 @@ async function main() {
     process.exit(1);
   }
 
-  if (!opts.userid || Number.isNaN(opts.userid)) {
-    console.error(
-      "Anna oma Moodle-käyttäjä-id:si --userid-lipulla, tai aseta se dashboardin " +
-        "Asetukset-sivulla (tai suoraan MOODLE_USERID-kenttänä .env-tiedostoon). " +
-        "Löydät sen kalenterin ICS-vientilinkin \"userid=\"-parametrista tai omalta " +
-        "profiilisivultasi Moodlessa."
-    );
-    process.exit(1);
-  }
-
-  const url = `${opts.baseUrl}/user/profile.php?id=${opts.userid}&showallcourses=1`;
-  console.log(`Haetaan kurssilista: ${url}`);
+  const userid = opts.userid && !Number.isNaN(opts.userid) ? opts.userid : null;
+  console.log("Haetaan oma kurssilista Moodlen profiilisivulta...");
   let html;
+  let discovered;
   try {
-    html = await fetchMoodlePage(url, opts.session);
+    ({ html, discovered } = await fetchOwnCourseLinks(opts.baseUrl, opts.session, userid));
   } catch (err) {
     console.error("VIRHE: " + err.message);
     process.exit(1);
   }
-
-  const discovered = extractCourseLinks(html);
 
   if (opts.debug || discovered.size === 0) {
     fs.writeFileSync(debugFile("debug_profile.html"), html);
@@ -150,7 +163,7 @@ async function main() {
 
   if (discovered.size === 0) {
     console.log(
-      "Sivulta ei löytynyt yhtään course/view.php-linkkiä. Joko --userid on väärä, sivu on eri " +
+      "Sivulta ei löytynyt yhtään kurssilinkkiä. Joko --userid on väärä, sivu on eri " +
         "muotoinen kuin odotettiin, tai istunto ei toiminut."
     );
     return;
@@ -224,4 +237,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { extractCourseLinks, scoreMatch, normalize };
+module.exports = { extractCourseLinks, scoreMatch, normalize, fetchOwnCourseLinks, detectOwnUserId };

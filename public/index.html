@@ -234,6 +234,7 @@
   .sync-status:empty { display: none; }
   .sync-status.sync-error { color: var(--danger); font-weight: 600; }
   .sync-status.sync-ok { color: var(--ok); font-weight: 600; }
+  .sync-status.sync-warn { color: var(--warn); font-weight: 600; }
 
   /* ==========================================================================
      Otsikot, osiot, ohjelaatikot
@@ -3472,7 +3473,7 @@
         { key: "MOODLE_USERNAME", label: "Käyttäjätunnus", sub: "SAMK-tunnuksesi (Haka)" },
         { key: "MOODLE_PASSWORD", label: "Salasana", password: true, sub: "Tallennetaan selkokielisenä .env-tiedostoon - suojaa koneesi normaalisti" },
         { key: "MOODLE_SESSION", label: "MoodleSession-eväste", password: true, sub: "DevToolsista haettu arvo, vaihtoehto yllä oleville" },
-        { key: "MOODLE_USERID", label: "Oma Moodle-käyttäjä-id", sub: "Numero kalenterin ICS-vientilinkin \"userid=\"-parametrista tai Moodlen profiilisivun osoitteesta. Tarvitaan uusien kurssien löytämiseen." },
+        { key: "MOODLE_USERID", label: "Moodle-käyttäjä-id (valinnainen)", sub: "Ei yleensä tarvita: oma tili tunnistetaan kirjautumisesta. Täytä vain, jos uusia kursseja ei löydy." },
       ],
     },
     {
@@ -3948,9 +3949,16 @@
     if (s.catalogFilled && s.catalogFilled.length) news.push(s.catalogFilled.length + " kurssin tiedot täydennetty");
     let text;
     let isError = false;
+    let isWarn = false;
+    const acts = s.activitiesScanned || 0;
     if (!courses) {
       text = "Yhtään kurssia ei voitu tarkistaa";
       isError = true;
+    } else if (acts > 0 && !(s.dueFound || 0) && !news.length) {
+      // Tehtäviä löytyi, mutta yhdestäkään ei tunnistettu päivämäärää:
+      // lähes aina merkki siitä, ettei Moodlen sivua osattu jäsentää.
+      text = courses + " kurssia ja " + acts + " tehtävää tarkistettu, mutta yhdeltäkään ei tunnistettu määräaikaa";
+      isWarn = true;
     } else {
       text =
         courses + " kurssia ja " + (s.activitiesScanned || 0) + " tehtävää tarkistettu, " +
@@ -3968,14 +3976,15 @@
         (c.added ? ", " + c.added + " uutta" : "") + (c.error ? " (virhe: " + c.error + ")" : "")
     );
     if (errors.length) lines.push("", "Virheet:", ...errors);
-    return { text, isError, tooltip: lines.join("\n") };
+    if (isWarn) lines.push("", "Yksityiskohdat: data/sync_report.json");
+    return { text, isError, isWarn, tooltip: lines.join("\n") };
   }
 
   function showSyncResult(result, prefix) {
     const statusEl = document.getElementById("syncStatus");
     statusEl.textContent = (prefix || "") + result.text + ".";
     statusEl.title = result.tooltip || "";
-    statusEl.className = "sync-status " + (result.isError ? "sync-error" : "sync-ok");
+    statusEl.className = "sync-status " + (result.isError ? "sync-error" : result.isWarn ? "sync-warn" : "sync-ok");
   }
 
   (function showLastSyncTime() {
@@ -3987,7 +3996,8 @@
     } catch (e) {}
     if (iso && last) {
       showSyncResult(last, "Viimeksi haettu " + formatSyncTimestamp(iso) + ": ");
-      document.getElementById("syncStatus").className = "sync-status" + (last.isError ? " sync-error" : "");
+      document.getElementById("syncStatus").className =
+        "sync-status" + (last.isError ? " sync-error" : last.isWarn ? " sync-warn" : "");
     } else if (iso) {
       document.getElementById("syncStatus").textContent = "Viimeksi haettu " + formatSyncTimestamp(iso);
     }

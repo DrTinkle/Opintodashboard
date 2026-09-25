@@ -22,7 +22,7 @@
 // Kaytto:
 //   node src/moodle/sync_moodle.js
 //   node src/moodle/sync_moodle.js --delay 800       (viive pyyntojen valissa ms, oletus 500)
-//   node src/moodle/sync_moodle.js --userid 12345    (oma Moodle-userid; oletus .env:n MOODLE_USERID)
+//   node src/moodle/sync_moodle.js --userid 12345    (valinnainen oma Moodle-userid; oletus .env:n MOODLE_USERID)
 //
 // Tata kutsutaan myos server.js:n "/api/sync-moodle"-reitilta (dashboardin
 // "Hae uudet Moodlesta" -nappi), jolloin runSync()-funktiota kutsutaan
@@ -40,7 +40,7 @@ const {
   decodeEntities,
   BASE_URL,
 } = require("./scrape_course_content.js");
-const { extractCourseLinks, scoreMatch } = require("./find_moodle_ids.js");
+const { scoreMatch, fetchOwnCourseLinks } = require("./find_moodle_ids.js");
 const {
   extractActivityDates,
   extractIntroDescription,
@@ -50,9 +50,9 @@ const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js")
 
 // REPORT_PATH (data/sync_report.json): viimeisimmän synkan yksityiskohtainen
 // raportti (mitä Moodlesta löytyi ja mihin se täsmättiin). Ei jaeta.
-// Oma Moodle-käyttäjä-id luetaan .env:n MOODLE_USERID-kentästä (Asetukset-
-// välilehti) kutsuhetkellä, jotta Asetuksissa tehty muutos on heti voimassa.
-// Ei oletusarvoa, koska id on jokaisella eri.
+// Valinnainen oma Moodle-käyttäjä-id luetaan .env:n MOODLE_USERID-kentästä
+// (Asetukset-välilehti) kutsuhetkellä, jotta Asetuksissa tehty muutos on heti
+// voimassa. Yleensä tyhjä: silloin haetaan kirjautuneen käyttäjän oma profiili.
 function defaultUserid() {
   const v = Number(process.env.MOODLE_USERID);
   return Number.isFinite(v) && v > 0 ? v : null;
@@ -174,25 +174,18 @@ function sleep(ms) {
 // olemassa olevaan kurssiin edes valttavasti) kurssit data.json:iin
 // minimitiedoilla. Mutatoi `data`-taulukkoa suoraan.
 async function discoverAndAddNewCourses(data, session, baseUrl, opts) {
+  // Käyttäjä-id on valinnainen: ilman sitä haetaan kirjautuneen käyttäjän
+  // oma profiili (ks. fetchOwnCourseLinks).
   const userid = opts.userid || defaultUserid();
-  if (!userid) {
-    return {
-      newCourses: [],
-      error:
-        "Uusien kurssien haku ohitettiin: oma Moodle-käyttäjä-id puuttuu. " +
-        "Aseta se Asetukset-välilehdellä (MOODLE_USERID). Olemassa olevien " +
-        "kurssien tehtävät haettiin silti normaalisti.",
-    };
-  }
-  const url = `${baseUrl}/user/profile.php?id=${userid}&showallcourses=1`;
-  let html;
+  let discovered;
   try {
-    html = await fetchMoodlePage(url, session);
+    ({ discovered } = await fetchOwnCourseLinks(baseUrl, session, userid));
   } catch (err) {
     return { newCourses: [], error: "Kurssilistan haku epäonnistui: " + err.message };
   }
-
-  const discovered = extractCourseLinks(html);
+  if (!discovered.size) {
+    return { newCourses: [], error: "Moodlen profiilisivulta ei löytynyt yhtään kurssia." };
+  }
   const usedIds = new Set(data.filter((c) => c.moodleId).map((c) => c.moodleId));
   const existingIds = new Set(data.map((c) => c.id));
   const newCourses = [];
@@ -448,6 +441,9 @@ if (require.main === module) {
       summary.newTasks.forEach((t) => console.log(`  + [${t.course}] ${t.title} (${t.date})`));
       console.log(`Kursseja skannattu: ${summary.coursesScanned}, aktiviteetteja tarkistettu: ${summary.activitiesScanned}`);
       console.log(`Määräaikoja Moodlessa: ${summary.dueFound}, joista jo listalla: ${summary.alreadyKnown}`);
+      if (summary.activitiesScanned > 0 && summary.dueFound === 0) {
+        console.log("VAROITUS: tehtäviä löytyi, mutta yhdeltäkään ei tunnistettu määräaikaa. Katso data/sync_report.json.");
+      }
       summary.courses.forEach((c) =>
         console.log(
           `  ${c.name}: ${c.activities} tehtävää, ${c.withDue} määräaikaa, ${c.known} jo listalla, ${c.added} uutta` +
