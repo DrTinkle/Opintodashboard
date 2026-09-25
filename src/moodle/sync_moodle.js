@@ -47,7 +47,7 @@ const {
   SCANNABLE_TYPES,
 } = require("./find_deadlines.js");
 const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js");
-const { findExamWindows } = require("./exam_windows.js");
+const { findTextExams } = require("./exam_windows.js");
 
 // REPORT_PATH (data/sync_report.json): viimeisimmän synkan yksityiskohtainen
 // raportti (mitä Moodlesta löytyi ja mihin se täsmättiin). Ei jaeta.
@@ -393,7 +393,7 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
     }
   }
 
-  await addExamWindows(course, topics, summary, stat);
+  await addTextExams(course, topics, summary, stat);
 }
 
 function fiDate(isoDate) {
@@ -401,36 +401,45 @@ function fiDate(isoDate) {
   return d + "." + m + "." + y;
 }
 
-// EXAM-tentit eivät ole Moodle-aktiviteetteja, joten niiden varausikkuna
-// luetaan kurssin tekstistä (ks. exam_windows.js). Määräaika on ikkunan
-// viimeinen päivä. Sama ikkuna tunnistetaan jo listalla olevaksi, jos
-// kurssilla on deadline samalla ikkunalla tai tentti samana päivänä.
-async function addExamWindows(course, topics, summary, stat) {
-  const title = "Tentti (EXAM-ikkuna)";
-  for (const w of findExamWindows(topics)) {
+// Tentit, jotka on kerrottu vain kurssin tekstissä (EXAM-ikkunat, paperi- ja
+// luokkatentit, ks. exam_windows.js). Jo listalla oleva tunnistetaan: sama
+// EXAM-ikkuna, tai tentti (tai otsikossa tentti/koe) samana päivänä.
+const EXAM_TITLE_RE = /tentti|koe|exam/i;
+
+async function addTextExams(course, topics, summary, stat) {
+  for (const x of findTextExams(topics, course)) {
+    const isExamWindow = x.kind === "window" && x.system === "exam";
+    const date = x.kind === "window" ? x.end : x.date;
+    const title = isExamWindow ? "Tentti (EXAM-ikkuna)" : x.kind === "date" ? x.title : "Tentti";
     stat.withDue++;
     summary.dueFound++;
     const match = course.deadlines.find(
       (d) =>
-        (d.examWindowStart === w.start && d.examWindowEnd === w.end) ||
-        (d.type === "exam" && d.date === w.end)
+        (x.kind === "window" && d.examWindowStart === x.start && d.examWindowEnd === x.end) ||
+        (d.date === date && (d.type === "exam" || EXAM_TITLE_RE.test(d.title || "")))
     );
     if (match) {
       stat.known++;
       summary.alreadyKnown++;
-      stat.items.push({ title, date: w.end, status: "known", matchedTo: match.title, source: "exam" });
+      stat.items.push({ title, date, status: "known", matchedTo: match.title, source: "text" });
       continue;
     }
-    const newDeadline = {
-      title,
-      date: w.end,
-      type: "exam",
-      notes:
-        "EXAM-varausikkuna " + fiDate(w.start) + " - " + fiDate(w.end) + " (kurssin Moodle-sivulta)." +
-        (w.link ? " Ilmoittautuminen: " + w.link : ""),
-      examWindowStart: w.start,
-      examWindowEnd: w.end,
-    };
+    const context = x.context.length > 300 ? x.context.slice(0, 300) + "..." : x.context;
+    let notes;
+    if (isExamWindow) {
+      notes =
+        "EXAM-varausikkuna " + fiDate(x.start) + " - " + fiDate(x.end) + " (kurssin Moodle-sivulta)." +
+        (x.link ? " Ilmoittautuminen: " + x.link : "");
+    } else if (x.kind === "window") {
+      notes = "Tentti-ikkuna " + fiDate(x.start) + " - " + fiDate(x.end) + ". Kurssin Moodle-sivulta: " + context;
+    } else {
+      notes = "Kurssin Moodle-sivulta: " + context;
+    }
+    const newDeadline = { title, date, type: "exam", notes };
+    if (isExamWindow) {
+      newDeadline.examWindowStart = x.start;
+      newDeadline.examWindowEnd = x.end;
+    }
     const estimate = await estimateWithDeepSeek(course, newDeadline);
     if (estimate) {
       newDeadline.estimatedHours = estimate.estimatedHours;
@@ -438,8 +447,8 @@ async function addExamWindows(course, topics, summary, stat) {
     }
     course.deadlines.push(newDeadline);
     stat.added++;
-    stat.items.push({ title, date: w.end, status: "new", source: "exam" });
-    summary.newTasks.push({ course: course.id, courseName: course.name, title, date: w.end });
+    stat.items.push({ title, date, status: "new", source: "text" });
+    summary.newTasks.push({ course: course.id, courseName: course.name, title, date });
   }
 }
 

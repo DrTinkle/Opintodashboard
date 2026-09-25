@@ -1,27 +1,31 @@
 // exam_windows.js
 //
-// EXAM-tenttien varausikkunat kurssin Moodle-sivun tekstistä.
+// Tentit, jotka on kerrottu vain kurssin Moodle-sivun tekstissä.
 //
-// EXAM-järjestelmä (exam5x.samk.fi) on Moodlesta erillinen palvelu, joten
-// EXAM-tenteillä ei ole Moodlessa aktiviteettia eikä "Due:"-päivää.
-// Opettajat kirjoittavat tentin ikkunan kurssin etusivulle tai osion
-// tekstiin, esim.
+// Moodle-quizina toteutetut tentit synkka löytää aktiviteetin omalta
+// sivulta ("Closes:"). Muut tentit ovat vain tekstiä: EXAM-järjestelmä
+// (exam5x.samk.fi) on Moodlesta erillinen, ja paperi- tai luokkatentistä
+// opettaja kirjoittaa päivän kurssin etusivulle. Esimerkkejä:
 //   "https://exam5x.samk.fi/enrolments/155529?code=IC250112    12.10.-1.11.2026"
 //   "Tentti 7.–22.11.2026: (ilmoittautumislinkit julkaistaan myöhemmin)"
-// Tämä moduuli etsii tekstistä rivit, joilla on päivämääräväli ja jotka
-// liittyvät tenttiin. Uusintatentit ohitetaan.
+//   "tentti suoritetaan paperille keskiviikkona 14.10.2026 klo 17:00"
 //
-// Rivi hyväksytään, jos
-//   - kurssin tekstissä mainitaan EXAM (sana tai exam5x-linkki), ja
-//   - rivillä on päivämääräväli, ja
-//   - rivillä tai sitä edeltävällä rivillä on EXAM-linkki tai sana
-//     "tentti"/"exam", eikä kummallakaan rivillä ole sanaa "uusinta".
+// Tekstistä poimitaan rivit, joilla tai joita edeltävällä rivillä
+// mainitaan tentti (tai on EXAM-linkki) ja joilla on päivämäärä:
+//   - päivämääräväli -> tenttiikkuna. EXAM-ikkunaksi (system "exam"), jos
+//     rivillä tai edellisellä on EXAM-linkki tai kurssin tekstissä
+//     mainitaan EXAM; muuten tavallinen ikkuna (system "other").
+//   - yksittäinen päivä -> tentti sinä päivänä (kind "date"). Vain rivin
+//     oma maininta kelpaa, ei edellisen rivin.
+// Ohitetaan uusintatentit, ilmoittautumispäivät ja avautumispäivät.
 
 const EXAM_LINK_RE = /https?:\/\/exam\w*\.samk\.fi\/[^\s)"]*/i;
 // "exam" omana sanana tai taivutettuna (Examissa, EXAM-tentti), ei "examples"
 const EXAM_WORD_RE = /\bexam(?:\b|issa|ista|iin|iä|ia|-)/i;
-const EXAM_CONTEXT_RE = /tentti|\bexam(?:\b|issa|ista|iin|iä|ia|-)/i;
-const RETAKE_RE = /uusinta/i;
+const EXAM_CONTEXT_RE = /tentti|tentin|kuulustelu|välikoe|loppukoe|\bexam(?:\b|issa|ista|iin|iä|ia|-)/i;
+const TITLE_RE = /(välitentti|lopputentti|välikoe|loppukoe)/i;
+const SKIP_RE = /uusinta/i;
+const SKIP_DATE_RE = /ilmoittau|avautuu|aukeaa|opens/i;
 const MAX_WINDOW_DAYS = 120;
 
 function iso(y, m, d) {
@@ -63,6 +67,23 @@ function parseDateRange(line) {
   return { start, end };
 }
 
+// Yksittäinen päivä "14.10.2026" tai "14.10." (vuosi päätellään kurssin
+// alkupäivästä: sama vuosi, tai seuraava jos päivä olisi ennen alkua).
+function parseSingleDate(line, courseStart) {
+  const m = line.match(/(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4})?(?![\d])/);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  let y = m[3] ? Number(m[3]) : null;
+  if (!y) {
+    const base = courseStart && /^\d{4}-\d{2}-\d{2}$/.test(courseStart) ? courseStart : new Date().toISOString().slice(0, 10);
+    y = Number(base.slice(0, 4));
+    if (validDate(y, mo, d) && iso(y, mo, d) < base) y++;
+  }
+  if (!validDate(y, mo, d)) return null;
+  return iso(y, mo, d);
+}
+
 // Kaikki kurssin tekstit: osioiden kuvaukset ja tekstisisältöiset kohteet.
 function collectTexts(topics) {
   const texts = [];
@@ -73,26 +94,49 @@ function collectTexts(topics) {
   return texts;
 }
 
-function findExamWindows(topics) {
+function titleFor(line) {
+  const m = line.match(TITLE_RE);
+  if (!m) return "Tentti";
+  return m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+}
+
+// Palauttaa listan:
+//   { kind: "window", system: "exam"|"other", start, end, link, context }
+//   { kind: "date", date, title, context }
+function findTextExams(topics, course) {
   const texts = collectTexts(topics);
-  const all = texts.join("\n");
-  if (!EXAM_LINK_RE.test(all) && !EXAM_WORD_RE.test(all)) return [];
+  const courseMentionsExam = texts.some((t) => EXAM_LINK_RE.test(t) || EXAM_WORD_RE.test(t));
   const found = new Map();
   for (const text of texts) {
     const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
     lines.forEach((line, i) => {
-      const range = parseDateRange(line);
-      if (!range) return;
+      if (!/\d{1,2}\.\d{1,2}\./.test(line)) return;
       const prev = i > 0 ? lines[i - 1] : "";
-      if (RETAKE_RE.test(line) || RETAKE_RE.test(prev)) return;
+      if (SKIP_RE.test(line) || SKIP_RE.test(prev)) return;
       const link = (line.match(EXAM_LINK_RE) || prev.match(EXAM_LINK_RE) || [null])[0];
-      if (!link && !EXAM_CONTEXT_RE.test(line) && !EXAM_CONTEXT_RE.test(prev)) return;
-      const key = range.start + "|" + range.end;
-      if (found.has(key)) return;
-      found.set(key, { ...range, link, context: (prev ? prev + "\n" : "") + line });
+      const range = parseDateRange(line);
+      if (range) {
+        if (!link && !EXAM_CONTEXT_RE.test(line) && !EXAM_CONTEXT_RE.test(prev)) return;
+        const key = "w|" + range.start + "|" + range.end;
+        if (!found.has(key)) {
+          found.set(key, {
+            kind: "window",
+            system: link || courseMentionsExam ? "exam" : "other",
+            ...range,
+            link,
+            context: line,
+          });
+        }
+        return;
+      }
+      if (link || !EXAM_CONTEXT_RE.test(line) || SKIP_DATE_RE.test(line)) return;
+      const date = parseSingleDate(line, course && course.start);
+      if (!date) return;
+      const key = "d|" + date;
+      if (!found.has(key)) found.set(key, { kind: "date", date, title: titleFor(line), context: line });
     });
   }
   return [...found.values()];
 }
 
-module.exports = { findExamWindows, parseDateRange };
+module.exports = { findTextExams, parseDateRange, parseSingleDate };

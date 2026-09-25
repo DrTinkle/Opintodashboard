@@ -87,7 +87,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 | `src/moodle/update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |
 | `src/moodle/scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`), Moodle-sivujen haku |
 | `src/moodle/find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
-| `src/moodle/exam_windows.js` | EXAM-tenttien varausikkunat kurssin Moodle-tekstistä (synkka käyttää) |
+| `src/moodle/exam_windows.js` | Tentit kurssin Moodle-tekstistä: EXAM-ikkunat, paperi- ja luokkatentit (synkka käyttää) |
 | `src/moodle/find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `data/deadline_scan.json` tarkistettavaksi |
 | `src/moodle/refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
 | `src/moodle/debug_fetch_page.js` | Vianetsintä: tallentaa yhden Moodle-sivun `debug/`-kansioon |
@@ -281,16 +281,24 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   kaikki kentät, ja korjaus on lisätä kurssille `moodleKeywords`.
 - **Labrat:** tyypiksi tulee `lab`, jos kurssin nimessä on "laboraatio"
   tai "labra" tai tehtävän otsikossa "labra".
-- **EXAM-tentit** (`exam_windows.js`): EXAM-järjestelmä (exam5x.samk.fi)
-  on Moodlesta erillinen, joten EXAM-tenteillä ei ole Moodle-aktiviteettia.
-  Varausikkuna luetaan kurssin tekstistä (osioiden kuvaukset, tekstit ja
-  sivut): rivi, jolla on päivämääräväli ("12.10.-1.11.2026",
-  "7.–22.11.2026", kaksi täyttä päivämäärää) ja jolla tai edellisellä
-  rivillä on EXAM-linkki tai sana "tentti"/"exam". Kurssin tekstissä pitää
-  mainita EXAM. Uusintatentit ohitetaan. Tulokseksi deadline
-  "Tentti (EXAM-ikkuna)", päivänä ikkunan loppu, `examWindowStart`/`End`
-  asetettuna; käyttöliittymä näyttää sen EXAM-tyyppisenä. Jos ikkunaa ei ole
-  vielä kirjoitettu Moodleen, sitä ei löydy.
+- **Tekstissä kerrotut tentit** (`exam_windows.js`): Moodle-quizina
+  toteutetut tentit löytyvät "Closes:"-päivästä kuten muutkin quizit. Muut
+  tentit ovat vain kurssin tekstissä: EXAM-järjestelmä (exam5x.samk.fi) on
+  Moodlesta erillinen, ja paperi- ja luokkatenttien päivä kirjoitetaan
+  kurssisivulle. Synkka lukee osioiden kuvaukset, tekstit ja sivut ja
+  poimii rivit, joilla (tai EXAM-linkin kohdalla edellisellä rivillä)
+  mainitaan tentti ja on päivämäärä:
+  - **Päivämääräväli** ("12.10.-1.11.2026", "7.–22.11.2026", kaksi täyttä
+    päivää): EXAM-ikkuna, jos rivillä on EXAM-linkki tai kurssin tekstissä
+    mainitaan EXAM. Siitä tulee "Tentti (EXAM-ikkuna)" ikkunan loppupäivälle
+    `examWindowStart`/`End`-kenttien kanssa. Muuten tavallinen "Tentti"
+    ikkunan loppupäivälle.
+  - **Yksittäinen päivä** ("tentti suoritetaan paperille 14.10.2026"): tentti
+    sinä päivänä. Ilman vuotta ("14.10.") vuosi päätellään kurssin
+    alkupäivästä.
+  - Ohitetaan uusintatentit sekä ilmoittautumis- ja avautumispäivät. Jo
+    listalla oleva tunnistetaan samasta EXAM-ikkunasta tai tentistä samana
+    päivänä. Jos päivää ei ole kirjoitettu Moodleen, tenttiä ei löydy.
 - **Duplikaatit:** synkan lisäämä deadline tallentaa aktiviteettinsa
   osoitteen (`moodleUrl`) ja täsmää jatkossa vain siihen. Käsin lisätyt
   verrataan samana päivänä otsikon merkitsevien sanojen perusteella
