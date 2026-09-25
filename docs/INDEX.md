@@ -79,7 +79,8 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 | Tiedosto | Tehtävä |
 | --- | --- |
 | `public/index.html` | Koko käyttöliittymä (HTML, CSS ja JS samassa tiedostossa) |
-| `src/server.js` | HTTP-palvelin (`public/`) + API-reitit, oletusportti 8080 |
+| `src/server.js` | HTTP-palvelin (`public/`) + API-reitit, oletusportti 8080, vain 127.0.0.1/::1 |
+| `src/json_file.js` | Atominen kirjoitus (tmp + rename) ja `data.json`:n muokkausajan tarkistus |
 | `src/paths.js` | Kaikki tiedostopolut ja vanhan rakenteen siirto |
 | `src/build.js` | `buildDataJs()`: generoi `public/data.js`:n `data/data.json`:sta |
 | `src/setup.js`, `setup.bat`, `setup.sh` | Käyttöönotto: Node-tarkistus, omat tiedostot esimerkeistä, build. `setup.bat` tarjoaa työpöydän pikakuvakkeet |
@@ -142,11 +143,14 @@ Omat tiedostot `data/`-kansiossa (kaikki `.gitignore`:ssa): `data.json`
 | `estimatedPace` | number | Oletustahti (h/vko) |
 | `examWindowStart`, `examWindowEnd` | `"YYYY-MM-DD"` | EXAM-varausikkuna |
 | `moodleUrl` | string | Moodle-aktiviteetti, josta deadline on haettu (synkka asettaa) |
+| `movedFrom` | `["YYYY-MM-DD"]` | Aiemmat päivät, jos opettaja on siirtänyt määräaikaa (synkka asettaa) |
 
 Deadlinella ei ole omaa id:tä. Kaikki selaimen tallennus avataan
 yhdistelmällä `kurssin id | päivä | otsikko` (ks. `itemKey()`
 `public/index.html`:ssä). Omilla tehtävillä on oma `id`-kenttä, jota `itemKey()`
-käyttää ensin.
+käyttää ensin. Kun synkka siirtää deadlinen päivää, `migrateMovedDeadlines()`
+kopioi tilan, arvion, valmiusprosentin ja muokkaukset `movedFrom`-päivien
+avaimilta uudelle avaimelle (jos uudella ei ole omaa merkintää).
 
 Tyyppi `"examsys"` (EXAM) ei esiinny `data.json`:issa: `rebuildAllItems()`
 luokittelee `exam`-kohteen ajon aikana EXAMiksi, kun sillä on
@@ -183,8 +187,23 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `POST /api/settings` | `{ set: {KEY: arvo}, clear: [KEY] }`. Kirjoittaa vain muuttuneet rivit `.env`:iin ja päivittää käynnissä olevan palvelimen `process.env`:n. |
 
 Kaikki muut polut tarjotaan staattisina tiedostoina `public/`-kansiosta
-(polun ohitus estetty `safeJoin()`:lla). Välimuisti on pois päältä, jotta `public/data.js`:n muutos
-näkyy heti uudelleenlatauksella.
+(polun ohitus estetty `safeJoin()`:lla, rikkinäinen %-koodaus antaa 400:n).
+Välimuisti on pois päältä, jotta `public/data.js`:n muutos näkyy heti
+uudelleenlatauksella.
+
+**Suojaus.** Palvelin on vain omaa konetta varten, mutta selaimessa auki
+oleva vieras sivusto voisi muuten lähettää sille pyyntöjä:
+
+- Palvelin kuuntelee vain `127.0.0.1`:tä ja `::1`:tä, ei verkkoa.
+- `Host`-otsakkeen pitää olla `localhost`/`127.0.0.1`/`[::1]` oikealla
+  portilla (DNS rebinding), muuten 403.
+- API-kutsuissa `Origin` (jos annettu) pitää olla dashboard itse, eikä
+  `Sec-Fetch-Site` saa olla `cross-site`. POST vaatii
+  `Content-Type: application/json`, joten toiselta sivulta lähetetty
+  lomake tai `no-cors`-pyyntö hylätään.
+- Asetusarvoissa ei hyväksytä rivinvaihtoja (ei uusia `.env`-rivejä).
+- Selain avaa aina `http://localhost:8080`: localStorage on sidottu
+  osoitteeseen, joten `127.0.0.1` näyttäisi tyhjältä dashboardilta.
 
 ## Asetukset ja .env
 
@@ -262,7 +281,15 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   `MOODLE_USERID` antaa id:n tarvittaessa, ja id tunnistetaan sivulta
   varalla, jos kursseja ei löydy)
   (linkit `user/view.php?...&course=<id>`). Kurssit täsmätään nimen
-  perusteella sumealla vertailulla.
+  perusteella sumealla vertailulla. Uusi Moodle-kurssi verrataan vain
+  kursseihin, joilla ei vielä ole `moodleId`:tä, joten esim.
+  "Matematiikka 2" lisätään, vaikka "Matematiikka 1" on jo listalla.
+- **Kirjautumissivun tunnistus:** kurssi- ja tehtäväsivuilla vain sivun
+  rakenteesta (`id="page-login-index"`, `name="logintoken"`), koska
+  kurssin tekstissä voi lukea "Kirjaudu sisään". Kirjautumisketju
+  (`refresh_moodle_session.js`) käyttää väljempää tarkistusta. Jos
+  automaattinen kirjautuminen epäonnistuu mutta tallennettu istunto on,
+  synkka jatkaa sillä.
 - **Kieli:** Moodle näyttää sivut istunnon tai tilin kieliasetuksen mukaan
   (skripti ei lähetä selaimen kieltä), joten `fetchMoodlePage()` lisää
   jokaiseen pyyntöön `lang=en`. Näin sivut ovat kaikilla englanniksi, ja
@@ -293,17 +320,35 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   kurssisivulle. Synkka lukee osioiden kuvaukset, tekstit ja sivut ja
   poimii rivit, joilla (tai EXAM-linkin kohdalla edellisellä rivillä)
   mainitaan tentti ja on päivämäärä:
+  - Jokaisella päivämäärällä on oma **konteksti**: teksti edellisestä
+    päivämäärästä tähän (rivin ensimmäiselle myös edellinen rivi). Näin
+    "Ilmoittautuminen 1.-7.10., tentti 14.10." ja "välikoe 1: 3.10.,
+    välikoe 2: 7.11." tulkitaan oikein. Päivämäärä on tentti, jos
+    kontekstissa mainitaan tentti (tai on EXAM-linkki) eikä siinä ole
+    ohitussanaa (uusinta, ilmoittautuminen, registration, re-exam,
+    palautus). "klo 12.10." on kellonaika.
   - **Päivämääräväli** ("12.10.-1.11.2026", "7.–22.11.2026", kaksi täyttä
-    päivää): EXAM-ikkuna, jos rivillä on EXAM-linkki tai kurssin tekstissä
-    mainitaan EXAM. Siitä tulee "Tentti (EXAM-ikkuna)" ikkunan loppupäivälle
-    `examWindowStart`/`End`-kenttien kanssa. Muuten tavallinen "Tentti"
-    ikkunan loppupäivälle.
+    päivää pelkän välilyönnin tai avautuu/sulkeutuu-sanojen välissä):
+    EXAM-ikkuna, jos kontekstissa on EXAM-linkki tai kurssin tekstissä
+    mainitaan EXAM (eikä kontekstissa puhuta Moodlesta). Siitä tulee
+    "Tentti (EXAM-ikkuna)" ikkunan loppupäivälle `examWindowStart`/`End`-
+    kenttien kanssa. Muuten tavallinen "Tentti" ikkunan loppupäivälle.
   - **Yksittäinen päivä** ("tentti suoritetaan paperille 14.10.2026"): tentti
-    sinä päivänä. Ilman vuotta ("14.10.") vuosi päätellään kurssin
-    alkupäivästä.
-  - Ohitetaan uusintatentit sekä ilmoittautumis- ja avautumispäivät. Jo
-    listalla oleva tunnistetaan samasta EXAM-ikkunasta tai tentistä samana
-    päivänä. Jos päivää ei ole kirjoitettu Moodleen, tenttiä ei löydy.
+    sinä päivänä, otsikko kontekstin mukaan (Tentti, Välitentti,
+    Lopputentti, Välikoe, Loppukoe). Ilman vuotta ("14.10.") vuosi
+    päätellään kurssin alkupäivästä, tai sen puuttuessa puolen vuoden
+    takaisesta päivästä. Pelkkä avautumispäivä ohitetaan.
+  - Jo listalla oleva tunnistetaan samasta EXAM-ikkunasta tai tentistä
+    samana päivänä. Jos päivää ei ole kirjoitettu Moodleen (tai se on
+    PDF:ssä), tenttiä ei löydy.
+- **Siirtyneet määräajat:** aktiviteettiin sidottu deadline täsmää
+  päivästä riippumatta. Jos Moodlen päivä on muuttunut, deadlinen `date`
+  päivitetään ja vanha päivä lisätään `movedFrom`-listaan (ks. yllä
+  selaimen merkintöjen siirto). Raportissa `moved`.
+- **Tallennus:** `data.json` kirjoitetaan atomisesti. Jos tiedostoa on
+  muokattu synkan aikana, mitään ei tallenneta ja synkka päättyy virheeseen
+  (raportti kirjoitetaan silti). Moodlen virhevastaus (esim. 503) on virhe,
+  eikä tyhjä kurssisivu korvaa kurssin tallennettua sisältöä.
 - **Duplikaatit:** synkan lisäämä deadline tallentaa aktiviteettinsa
   osoitteen (`moodleUrl`) ja täsmää jatkossa vain siihen. Käsin lisätyt
   verrataan samana päivänä otsikon merkitsevien sanojen perusteella
@@ -339,7 +384,10 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   kurssikoodien etuliitteistä (`IC250105-3002` -> `IC`). Haetaan kuluva ja
   edellinen lukuvuosi (lukuvuosi vaihtuu elokuussa).
 - **Kurssin tunnistus:** ensin koodilla (toteutus- tai opintojaksokoodi),
-  sitten nimellä. Useista toteutuksista valitaan oman ryhmän toteutus
+  sitten nimellä (toteutus- ja ryhmätunnukset poistettuina). Jos nimet
+  eivät ole samat, toisen pitää sisältyä toiseen kokonaisina sanoina
+  (vähintään 8 merkkiä), ja pisin osuva nimi voittaa. Yli viiden
+  vaihtoehdon tapauksessa ei täytetä mitään. Useista toteutuksista valitaan oman ryhmän toteutus
   (`SAMK_GROUP` tai yleisin ryhmä kursseilla, joilla on jo koodi) ja sitten
   se, joka on käynnissä kurssin alkaessa tai tänään. Jos valinta ei silti
   ole yksiselitteinen, täytetään vain kaikissa vaihtoehdoissa samat arvot.
@@ -357,7 +405,12 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   `rundll32 url.dll,FileProtocolHandler`:llä, koska `cmd /c start`
   katkaisee URL:n `&`-merkkiin.
 - Idempotentti: `data/sync_state.json` muistaa, mikä deadline vastaa mitäkin
-  Google-merkintää.
+  Google-merkintää. Tila tallennetaan jokaisen kohteen jälkeen, joten
+  keskeytynyt vienti ei luo tuplia.
+- Googlesta poistettu kohde (404/410) luodaan uudelleen. Jos lista,
+  kalenteri tai kohteen laji on vaihtunut, luodaan uusi kohde.
+- Selainkirjautuminen aikakatkaistaan 5 minuutissa, ja paluu tarkistetaan
+  `state`-arvolla. Googlen osoitteet ovat koodissa kiinteinä.
 
 ## DeepSeek-arviot
 

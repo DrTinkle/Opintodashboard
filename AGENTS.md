@@ -51,9 +51,21 @@ yksityiskohdat.
 - **Päivämäärä:** käytä `effDate(item)`:ia, joka huomioi varatun
   EXAM-päivän.
 - **Tallennusavaimet:** `itemKey()` (kurssi | päivä | otsikko) sitoo kaikki
-  localStorage-merkinnät tehtävään. Sen muodon muuttaminen hävittää
+  localStorage-merkinnät tehtävään. Jos synkka muuttaa deadlinen päivää,
+  sen pitää lisätä vanha päivä `movedFrom`-listaan, jotta
+  `migrateMovedDeadlines()` siirtää merkinnät. Sen muodon muuttaminen hävittää
   käyttäjien merkinnät. Jos localStorage-rakenne muuttuu, nosta avaimen
   versio (`_v2`) ja kirjoita migraatio.
+- **Päivämäärät selaimessa:** siirrä päiviä `addDays()`:lla, älä
+  `getTime() + n * 86400000`:lla (kesäaika siirtää tuloksen edelliselle
+  päivälle). Moodlen ja opinto-oppaan tekstit ovat epäluotettavia: aseta ne
+  `textContent`:lla, älä `innerHTML`:llä.
+- **Tiedostojen kirjoitus:** kirjoita `data.json` `json_file.js`:n
+  `readData()`/`writeData()`:lla (atominen, tarkistaa ettei tiedostoa ole
+  muokattu välissä) ja muut tilatiedostot `writeJsonAtomic()`:lla.
+- **Palvelimen suojaus:** uudet API-reitit lisätään `API_ROUTES`:iin, jolloin
+  Host-, Origin- ja sisältötyyppitarkistukset koskevat niitä. Selaimen
+  POST-kutsuissa pitää olla `Content-Type: application/json`.
 - **DOM rakennetaan uudelleen:** jos syötekentän `onchange` kutsuu
   `refresh()`:iä, viivästä se (`setTimeout`), muuten samaan aikaan
   klikattu nappi katoaa alta.

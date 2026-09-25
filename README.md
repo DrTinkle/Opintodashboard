@@ -136,6 +136,9 @@ GitHubissa. Käynnistä dashboard päivityksen jälkeen uudelleen ja paina
 
 - Kaikki pysyy omalla koneellasi. Kirjautumistiedot tallentuvat vain
   `.env`-tiedostoon, eikä niitä näytetä Asetuksissa uudelleen.
+- Dashboard toimii vain omalla koneellasi osoitteessa
+  http://localhost:8080. Muut laitteet samassa verkossa tai muut
+  verkkosivut eivät pääse siihen.
 - `.gitignore` pitää `.env`:n, kurssidatasi ja Google-tunnukset poissa
   gitistä. Älä silti jaa niitä kenellekään.
 - Salasana tallennetaan `.env`:iin selkokielisenä. Jos et halua sitä,
