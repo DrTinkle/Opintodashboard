@@ -359,8 +359,10 @@ function loadGoogleCredentials() {
     return {
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      auth_uri: process.env.GOOGLE_AUTH_URI || "https://accounts.google.com/o/oauth2/auth",
-      token_uri: process.env.GOOGLE_TOKEN_URI || "https://oauth2.googleapis.com/token",
+      // Googlen osoitteet ovat kiinteät, eivät .env:stä luettavia: muuten
+      // .env:iin kirjoitettu väärä osoite voisi ohjata tunnukset muualle.
+      auth_uri: "https://accounts.google.com/o/oauth2/auth",
+      token_uri: "https://oauth2.googleapis.com/token",
     };
   }
   const creds = loadJson(CREDENTIALS_PATH, null);

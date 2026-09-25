@@ -14,32 +14,48 @@
 const fs = require("fs");
 const { ENV_PATH } = require("./paths.js");
 
-function loadEnvFile(envPath) {
-  const target = envPath || ENV_PATH;
-  let content;
-  try {
-    content = fs.readFileSync(target, "utf8");
-  } catch (err) {
-    if (err.code === "ENOENT") return;
-    throw err;
-  }
-
-  content.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) return;
-    const key = trimmed.slice(0, eq).trim();
-    if (!key) return;
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!(key in process.env)) process.env[key] = value;
-  });
+// Jäsentää .env-tiedoston sisällön { KEY: value } -olioksi. Kommentit ja
+// tyhjät rivit ohitetaan, ympäröivät lainausmerkit poistetaan. Jos sama
+// avain on useammin kuin kerran, ENSIMMÄINEN voittaa. Samaa jäsennintä
+// käyttävät sekä skriptit (loadEnvFile) että server.js:n Asetukset-reitit,
+// jotta "asetettu"-tila ja todellinen arvo eivät voi erota.
+function parseEnv(content) {
+  const values = {};
+  String(content || "")
+    .split(/\r?\n/)
+    .forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) return;
+      const key = trimmed.slice(0, eq).trim();
+      if (!key || key in values) return;
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+        (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+      ) {
+        value = value.slice(1, -1);
+      }
+      values[key] = value;
+    });
+  return values;
 }
 
-module.exports = { loadEnvFile };
+function readEnvFile(envPath) {
+  try {
+    return parseEnv(fs.readFileSync(envPath || ENV_PATH, "utf8"));
+  } catch (err) {
+    if (err.code === "ENOENT") return {};
+    throw err;
+  }
+}
+
+function loadEnvFile(envPath) {
+  const values = readEnvFile(envPath);
+  for (const [key, value] of Object.entries(values)) {
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+
+module.exports = { loadEnvFile, parseEnv, readEnvFile };

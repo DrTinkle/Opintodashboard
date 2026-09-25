@@ -17,6 +17,7 @@ const path = require("path");
 const { exec } = require("child_process");
 
 const { PUBLIC_DIR, ENV_PATH, migrateLegacyFiles } = require("./paths.js");
+const { readEnvFile } = require("./load_env.js");
 
 // Vain public/-kansio tarjotaan selaimelle. Muut tiedostot (.env, data/,
 // koodi) eivät ole haettavissa palvelimen kautta.
@@ -52,11 +53,70 @@ function openInBrowser(url) {
   });
 }
 
+// Muuntaa pyynnön polun tiedostopoluksi public/-kansion sisällä. Palauttaa
+// null, jos polku on virheellinen (rikkinäinen %-koodaus, nollatavu) tai
+// osoittaa kansion ulkopuolelle ("..", myös "public_vanha"-tyyppiset
+// sisarkansiot, siksi vertailu erottimen kanssa).
 function safeJoin(root, urlPath) {
-  const decoded = decodeURIComponent(urlPath.split("?")[0]);
+  let decoded;
+  try {
+    decoded = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  } catch {
+    return null;
+  }
+  if (decoded.includes("\0")) return null;
   const resolved = path.normalize(path.join(root, decoded));
-  if (!resolved.startsWith(root)) return null; // estä hakemistosta ulos pääsy ("..")
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) return null;
   return resolved;
+}
+
+// --- Pyyntöjen lähteen tarkistus ---
+//
+// Palvelin kuuntelee vain omaa konetta (127.0.0.1 ja ::1), joten muut
+// laitteet samassa verkossa eivät pääse siihen. Lisäksi:
+//   - Host-otsakkeen pitää olla localhost / 127.0.0.1 / [::1] oikealla
+//     portilla. Estää DNS rebinding -hyökkäyksen, jossa vieras sivusto
+//     ohjaa oman osoitteensa tähän palvelimeen.
+//   - API-kutsuissa Origin-otsakkeen (jos selain lähettää sen) pitää olla
+//     dashboard itse, eikä Sec-Fetch-Site saa olla "cross-site".
+//   - POST-kutsujen sisältötyypin pitää olla application/json, jolloin
+//     selain ei lähetä niitä toiselta sivustolta ilman CORS-esitarkistusta
+//     (jota tämä palvelin ei hyväksy).
+// Näin mikään muu verkkosivu ei voi muuttaa asetuksia, käynnistää synkkaa
+// tai lukea kurssidataa.
+function allowedHosts(port) {
+  const hosts = new Set([`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`]);
+  if (port === 80) ["localhost", "127.0.0.1", "[::1]"].forEach((h) => hosts.add(h));
+  return hosts;
+}
+
+function isAllowedHost(req, port) {
+  return allowedHosts(port).has(String(req.headers.host || "").toLowerCase());
+}
+
+function isAllowedApiRequest(req, port) {
+  const origin = req.headers.origin;
+  if (origin !== undefined) {
+    let parsed;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "http:" || !allowedHosts(port).has(parsed.host.toLowerCase())) return false;
+  }
+  if (req.headers["sec-fetch-site"] === "cross-site") return false;
+  if (req.method === "POST") {
+    const type = String(req.headers["content-type"] || "").toLowerCase();
+    if (!type.startsWith("application/json")) return false;
+  }
+  return true;
+}
+
+function sendJson(res, status, obj) {
+  if (res.headersSent) return;
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(obj));
 }
 
 // "Hae uudet Moodlesta" -nappi dashboardilla kutsuu tätä (POST, ei runkoa).
@@ -184,50 +244,30 @@ const SETTINGS_KEYS = [
   "DEEPSEEK_API_KEY",
 ];
 
-// Lukee .env:in KEY=VALUE-rivit map:iksi ilman että koskee process.env:iin.
-// Sama yksinkertainen parseri kuin load_env.js:ssä (kommentit/tyhjät rivit
-// ohitetaan, ei tueta rivinvaihtoja arvon sisällä).
-function readEnvValues() {
-  const values = {};
-  let content;
-  try {
-    content = fs.readFileSync(ENV_PATH, "utf8");
-  } catch (err) {
-    if (err.code === "ENOENT") return values;
-    throw err;
-  }
-  content.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) return;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-    ) {
-      value = value.slice(1, -1);
-    }
-    values[key] = value;
-  });
-  return values;
-}
-
+// .env luetaan samalla jäsentimellä kuin skripteissä (load_env.js), jotta
+// "asetettu"-tila vastaa sitä arvoa, jonka skriptit oikeasti saavat.
 function handleSettingsStatusRequest(req, res) {
-  const values = readEnvValues();
+  let values;
+  try {
+    values = readEnvFile(ENV_PATH);
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: ".env-tiedoston luku epäonnistui: " + err.message });
+    return;
+  }
   const status = {};
   SETTINGS_KEYS.forEach((key) => {
     status[key] = !!(values[key] && values[key].length);
   });
-  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify({ ok: true, status }));
+  sendJson(res, 200, { ok: true, status });
 }
 
 // Kirjoittaa .env-tiedostoon vain pyydetyt muutokset rivi kerrallaan (KEY=
 // -rivi korvataan jos löytyy, muuten lisätään loppuun), säilyttäen kaikki
-// muut rivit (kommentit mukaan lukien) koskemattomina. Jos tiedostoa ei ole
-// vielä olemassa, se luodaan tästä.
+// muut rivit (kommentit mukaan lukien) koskemattomina. Saman avaimen
+// myöhemmät rivit poistetaan, jotta arvo on yksiselitteinen. Kirjoitus
+// tehdään väliaikaistiedostoon ja nimetään sitten, jottei kesken jäänyt
+// kirjoitus voi tyhjentää tiedostoa. Jos tiedostoa ei ole vielä olemassa,
+// se luodaan tästä.
 function writeEnvValues(updates) {
   let lines = [];
   try {
@@ -237,23 +277,26 @@ function writeEnvValues(updates) {
   }
   if (lines.length && lines[lines.length - 1] === "") lines.pop();
 
+  const keyOf = (line) => {
+    const t = line.trim();
+    if (t.startsWith("#")) return null;
+    const eq = t.indexOf("=");
+    return eq === -1 ? null : t.slice(0, eq).trim();
+  };
   Object.keys(updates).forEach((key) => {
     const newLine = key + "=" + updates[key];
-    let found = false;
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-      if (trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq !== -1 && trimmed.slice(0, eq).trim() === key) {
-        lines[i] = newLine;
-        found = true;
-        break;
-      }
+    const first = lines.findIndex((line) => keyOf(line) === key);
+    if (first === -1) {
+      lines.push(newLine);
+      return;
     }
-    if (!found) lines.push(newLine);
+    lines = lines.filter((line, i) => i <= first || keyOf(line) !== key);
+    lines[first] = newLine;
   });
 
-  fs.writeFileSync(ENV_PATH, lines.join("\n") + "\n", "utf8");
+  const tmp = ENV_PATH + ".tmp";
+  fs.writeFileSync(tmp, lines.join("\n") + "\n", "utf8");
+  fs.renameSync(tmp, ENV_PATH);
 }
 
 function readRequestBody(req) {
@@ -285,7 +328,14 @@ async function handleSettingsSaveRequest(req, res) {
 
   for (const key of Object.keys(set)) {
     if (!SETTINGS_KEYS.includes(key)) continue;
-    const value = String(set[key]);
+    if (typeof set[key] !== "string") continue;
+    const value = set[key].trim();
+    // Rivinvaihto arvossa lisäisi .env:iin uuden rivin (eli uuden
+    // asetuksen), joten sellaista ei hyväksytä.
+    if (/[\r\n\0]/.test(value)) {
+      sendJson(res, 400, { ok: false, error: key + ": arvossa ei saa olla rivinvaihtoja." });
+      return;
+    }
     if (value) updates[key] = value;
   }
   for (const key of clear) {
@@ -339,70 +389,115 @@ function prepareFiles() {
   }
 }
 
+function serveStatic(req, res) {
+  const filePath = safeJoin(ROOT, req.url === "/" ? "/index.html" : req.url);
+  if (!filePath) {
+    res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Virheellinen polku");
+    return;
+  }
+
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("404 - tiedostoa ei löytynyt");
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Palvelinvirhe");
+        return;
+      }
+      // "no-cache" jokaiselle tiedostolle: dashboard lukee data.js:n
+      // sisällön ladatessaan sivun, ja synkronoinnin jälkeisen
+      // sivunlatauksen pitää aina saada tuorein data.js eikä selaimen
+      // välimuistista jäänyttä vanhaa versiota.
+      res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-cache" });
+      res.end(data);
+    });
+  });
+}
+
+const API_ROUTES = {
+  "POST /api/sync-moodle": handleSyncRequest,
+  "POST /api/sync-google": handleSyncGoogleRequest,
+  "GET /api/settings/status": handleSettingsStatusRequest,
+  "POST /api/settings": handleSettingsSaveRequest,
+};
+
+function handleRequest(req, res, port) {
+  if (!isAllowedHost(req, port)) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Kielletty: dashboardia voi käyttää vain osoitteesta http://localhost:" + port);
+    return;
+  }
+
+  const urlPath = String(req.url || "/").split("?")[0];
+  if (urlPath.startsWith("/api/")) {
+    const route = API_ROUTES[req.method + " " + urlPath];
+    if (!route) {
+      sendJson(res, 404, { ok: false, error: "Tuntematon API-reitti." });
+      return;
+    }
+    if (!isAllowedApiRequest(req, port)) {
+      sendJson(res, 403, { ok: false, error: "Pyyntö hylättiin: se ei tullut dashboardilta itseltään." });
+      return;
+    }
+    Promise.resolve(route(req, res)).catch((err) => {
+      console.error("API-virhe:", err.message);
+      sendJson(res, 500, { ok: false, error: err.message });
+    });
+    return;
+  }
+
+  serveStatic(req, res);
+}
+
 function main() {
   prepareFiles();
   const { port } = parseArgs();
 
-  const server = http.createServer((req, res) => {
-    if (req.method === "POST" && req.url === "/api/sync-moodle") {
-      handleSyncRequest(req, res);
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/sync-google") {
-      handleSyncGoogleRequest(req, res);
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/settings/status") {
-      handleSettingsStatusRequest(req, res);
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/settings") {
-      handleSettingsSaveRequest(req, res);
-      return;
-    }
-
-    let filePath = safeJoin(ROOT, req.url === "/" ? "/index.html" : req.url);
-    if (!filePath) {
-      res.writeHead(400);
-      res.end("Virheellinen polku");
-      return;
-    }
-
-    fs.stat(filePath, (err, stats) => {
-      if (err || !stats.isFile()) {
-        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("404 - tiedostoa ei löytynyt: " + req.url);
-        return;
+  const handler = (req, res) => {
+    try {
+      handleRequest(req, res, port);
+    } catch (err) {
+      console.error("Pyynnön käsittely epäonnistui:", err.message);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Palvelinvirhe");
       }
+    }
+  };
 
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+  // Moodle-synkronointi voi kestää pari minuuttia (useita kursseja,
+  // aktiviteetti kerrallaan), ja Google-vienti voi joutua odottamaan
+  // selaimessa tehtävää kirjautumista jos token on vanhentunut - poistetaan
+  // Noden oletusaikakatkaisut ettei pyyntöä katkaista kesken.
+  const createServer = () => {
+    const srv = http.createServer(handler);
+    srv.requestTimeout = 0;
+    srv.headersTimeout = 0;
+    srv.timeout = 0;
+    return srv;
+  };
 
-      fs.readFile(filePath, (err, data) => {
-        if (err) {
-          res.writeHead(500);
-          res.end("Palvelinvirhe");
-          return;
-        }
-        // "no-cache" jokaiselle tiedostolle: dashboard lukee data.js:n
-        // sisällön ladatessaan sivun, ja synkronoinnin jälkeisen
-        // sivunlatauksen pitää aina saada tuorein data.js eikä selaimen
-        // välimuistista jäänyttä vanhaa versiota.
-        res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-cache" });
-        res.end(data);
-      });
-    });
-  });
+  // Kuunnellaan vain omaa konetta: IPv4 127.0.0.1 ja, jos koneessa on IPv6,
+  // myös ::1 (selain voi yhdistää "localhost"-osoitteeseen kummalla
+  // tahansa). Ei koskaan kaikkia verkkoliitäntöjä, jottei dashboard näy
+  // muille laitteille samassa verkossa.
+  const server = createServer();
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
       // Jos portissa on jo käynnissä oleva dashboard (esim. kaynnista.bat
       // tuplaklikattu toiseen kertaan), avataan vain selain siihen.
       const url = `http://localhost:${port}`;
-      fetch(url + "/api/settings/status")
+      fetch(`http://127.0.0.1:${port}/api/settings/status`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null)
         .then((body) => {
@@ -420,15 +515,13 @@ function main() {
     throw err;
   });
 
-  // Moodle-synkronointi voi kestää pari minuuttia (useita kursseja,
-  // aktiviteetti kerrallaan), ja Google-vienti voi joutua odottamaan
-  // selaimessa tehtävää kirjautumista jos token on vanhentunut - poistetaan
-  // Noden oletusaikakatkaisut ettei pyyntöä katkaista kesken.
-  server.requestTimeout = 0;
-  server.headersTimeout = 0;
-  server.timeout = 0;
+  server.listen(port, "127.0.0.1", () => {
+    const server6 = createServer();
+    server6.on("error", () => {
+      /* ei IPv6:ta tai ::1 varattu: IPv4 riittää */
+    });
+    server6.listen(port, "::1");
 
-  server.listen(port, () => {
     const url = `http://localhost:${port}`;
     console.log(`Opintodashboard käynnissä osoitteessa ${url}`);
     console.log("Pysäytä palvelin Ctrl+C:llä.");

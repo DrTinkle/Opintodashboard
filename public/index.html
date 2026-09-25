@@ -4067,7 +4067,7 @@
     statusEl.textContent = "Haetaan Moodlesta... (voi kestää pari minuuttia)";
 
     try {
-      const res = await fetch("/api/sync-moodle", { method: "POST" });
+      const res = await fetch("/api/sync-moodle", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const body = await res.json();
       if (!res.ok || !body.ok) throw new Error(body.error || "HTTP " + res.status);
 
@@ -4128,7 +4128,7 @@
     statusEl.textContent = "Viedään Google-kalenteriin... (selain saattaa avautua kirjautumista varten)";
 
     try {
-      const res = await fetch("/api/sync-google", { method: "POST" });
+      const res = await fetch("/api/sync-google", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const body = await res.json();
       if (!res.ok || !body.ok) throw new Error(body.error || "HTTP " + res.status);
 
