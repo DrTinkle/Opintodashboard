@@ -53,10 +53,15 @@ function academicYear(date = new Date()) {
 }
 
 function normalizeName(s) {
+  // Toteutuskoodi pois ENNEN pienaakkosia: REALIZATION_CODE_RE vaatii isot
+  // kirjaimet. Myös ryhmätunnukset (esim. AIC25SP) ja pelkät
+  // opintojaksokoodit (SY221111) pois.
   return String(s || "")
+    .replace(new RegExp(REALIZATION_CODE_RE.source, "g"), " ")
+    .replace(/\b[A-Z]{2,4}\d{2}[A-Z]{2,3}\b/g, " ")
+    .replace(/\b[A-Z]{2}\d{6}\b/g, " ")
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
-    .replace(REALIZATION_CODE_RE, " ")
     .replace(/[^a-z0-9åäö]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -171,12 +176,19 @@ function findCandidates(course, realizations) {
   const same = realizations.filter((r) => normalizeName(realizationName(r)) === name);
   if (same.length) return same;
   // Moodlen nimessä voi olla lisäosia ("..., syksy 2026"): hyväksytään, jos
-  // opinto-oppaan nimi sisältyy Moodlen nimeen (tai päinvastoin) ja on
-  // riittävän pitkä ollakseen yksilöivä.
-  return realizations.filter((r) => {
+  // opinto-oppaan nimi sisältyy Moodlen nimeen (tai päinvastoin)
+  // KOKONAISINA SANOINA ja molemmat nimet ovat riittävän pitkiä ollakseen
+  // yksilöiviä. Pelkkä merkkijonon sisältyminen yhdisti esim. "IoT" ->
+  // "Kommunikaatiotekniikka" ja "Ohjelmointi" -> "Olio-ohjelmointi".
+  if (name.length < 8) return [];
+  const containsWords = (hay, needle) => (" " + hay + " ").includes(" " + needle + " ");
+  const matches = realizations.filter((r) => {
     const rn = normalizeName(realizationName(r));
-    return rn.length >= 8 && (name.includes(rn) || rn.includes(name));
+    return rn.length >= 8 && (containsWords(name, rn) || containsWords(rn, name));
   });
+  // Pisin osuva nimi voittaa ("olio ohjelmointi" ennen "ohjelmointi").
+  const longest = Math.max(0, ...matches.map((r) => normalizeName(realizationName(r)).length));
+  return matches.filter((r) => normalizeName(realizationName(r)).length === longest);
 }
 
 function narrowCandidates(course, candidates, userGroups) {
@@ -232,6 +244,9 @@ async function enrichFromCatalog(data, { log = () => {} } = {}) {
   for (const course of targets) {
     const candidates = narrowCandidates(course, findCandidates(course, realizations), userGroups);
     if (!candidates.length) continue;
+    // Liian monta vaihtoehtoa: nimi ei ole yksilöivä, eikä kentistä voida
+    // olla varmoja (alla verrataan vain viittä ensimmäistä).
+    if (candidates.length > 5) continue;
 
     const details = [];
     for (const r of candidates.slice(0, 5)) details.push(await fetchJson(CATALOG_BASE + "realization/" + r.id));
