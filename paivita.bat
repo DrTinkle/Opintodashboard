@@ -27,6 +27,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem Kaynnissa oleva dashboard pitaa sulkea ensin: paivitys korvaa
+rem kaynnista.bat:n, jota sen ikkuna viela ajaa.
+:checkrunning
+curl -s -o nul -m 2 http://127.0.0.1:8080/ >nul 2>nul
+if errorlevel 1 goto :notrunning
+echo Dashboard on kaynnissa. Sulje sen ikkuna ennen paivitysta.
+choice /C KE /M "Suljitko dashboardin ikkunan (E peruu paivityksen)"
+if errorlevel 2 exit /b 1
+goto :checkrunning
+:notrunning
+
 if not exist ".git" goto :zip
 where git >nul 2>nul
 if errorlevel 1 goto :zip

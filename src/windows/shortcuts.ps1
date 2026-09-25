@@ -9,7 +9,7 @@
 # tiedoston ANSI-merkistona. Siksi a-umlaut tehdaan merkkikoodista.
 
 $ErrorActionPreference = 'Stop'
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $desktop = [Environment]::GetFolderPath('Desktop')
 $ae = [char]0x00E4
 $shell = New-Object -ComObject WScript.Shell
