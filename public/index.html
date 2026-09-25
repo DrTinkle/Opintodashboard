@@ -1554,11 +1554,31 @@
     return Math.round((b - a) / 86400000);
   }
 
+  // Päivien lisääminen kalenteripäivinä. getTime() + n * 86400000 menee
+  // kesäajan vaihtuessa tunnin pieleen (esim. 25.10. muuttuu 24.10. klo
+  // 23:ksi), joten päiviä siirrettäessä käytetään aina Date(v, k, p + n):ää.
+  // Edistymispalkin nimiö: tila vasemmalle, päivät oikealle. Arvot tulevat
+  // opinto-oppaasta, joten ne asetetaan tekstinä, ei HTML:nä.
+  function setProgressLabel(el, left, right) {
+    el.textContent = "";
+    const a = document.createElement("span");
+    a.textContent = left;
+    const b = document.createElement("span");
+    b.textContent = right;
+    el.appendChild(a);
+    el.appendChild(b);
+  }
+
+  function addDays(dt, n) {
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + n);
+  }
+
   function fmtDate(dt) {
     return dt.toLocaleDateString("fi-FI", { weekday: "short", day: "numeric", month: "numeric" });
   }
 
-  const today = startOfToday();
+  // Päivitetään refresh():ssä, jotta yön yli auki ollut sivu ei jää eiliseen.
+  let today = startOfToday();
 
   const courseById = {};
   COURSES.forEach((c) => { courseById[c.id] = c; });
@@ -1657,7 +1677,7 @@
     const info = getExamWindowInfo(courseId);
     const windowStart = parseDate((info && info.start) || deadlineIso);
     const deadlineDate = parseDate(deadlineIso);
-    const bookableUntil = new Date(today.getTime() + EXAM_BOOKING_HORIZON_DAYS * 86400000);
+    const bookableUntil = addDays(today, EXAM_BOOKING_HORIZON_DAYS);
     if (bookableUntil >= deadlineDate) {
       return {
         status: "full",
@@ -1675,7 +1695,7 @@
           " vrk etukäteen) — myöhemmät ajat ilmestyvät sitä mukaa kun ehdit lähemmäs.",
       };
     }
-    const opensInDays = Math.max(0, daysBetween(today, new Date(windowStart.getTime() - EXAM_BOOKING_HORIZON_DAYS * 86400000)));
+    const opensInDays = Math.max(0, daysBetween(today, addDays(windowStart, -EXAM_BOOKING_HORIZON_DAYS)));
     return {
       status: "none",
       text:
@@ -1798,7 +1818,7 @@
     if (!hours || !pace) return null;
     const dt = parseDate(effDate(item));
     const weeksNeeded = hours / pace;
-    return new Date(dt.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+    return addDays(dt, -Math.round(weeksNeeded * 7));
   }
 
   function compareBySortKey(key, dir) {
@@ -1873,8 +1893,8 @@
   function getWeekMonday(offset) {
     const jsDay = today.getDay(); // 0 = su ... 6 = la
     const mondayDelta = jsDay === 0 ? -6 : 1 - jsDay;
-    const thisMonday = new Date(today.getTime() + mondayDelta * 86400000);
-    return new Date(thisMonday.getTime() + offset * 7 * 86400000);
+    const thisMonday = addDays(today, mondayDelta);
+    return addDays(thisMonday, offset * 7);
   }
 
   function fmtShort(dt) {
@@ -1916,7 +1936,7 @@
 
     const perDay = {};
     for (let offset = 0; offset < WEEK_HORIZON_DAYS; offset++) {
-      const day = new Date(today.getTime() + offset * 86400000);
+      const day = addDays(today, offset);
       const iso = toIsoDate(day);
       const wd = (day.getDay() + 6) % 7; // ma=0 ... su=6
       let capLeft = noStudySet.has(iso) ? 0 : (capacityArr[wd] || 0);
@@ -2203,7 +2223,7 @@
         return;
       }
       const weeksNeeded = hours / pace;
-      const startDate = new Date(dt.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+      const startDate = addDays(dt, -Math.round(weeksNeeded * 7));
       // Ei näytetä "(myöhässä)"-leimaa jos tehtävä on jo merkitty "Työn alla"
       // tai "Tehty" -tilaan - työn ollessa kesken tai valmiina "myöhässä" ei
       // ole enää oikea/motivoiva kuvaus, vaikka laskennallinen aloituspäivä
@@ -2307,7 +2327,7 @@
     notDoingWrap.innerHTML = "";
     pastWrap.innerHTML = "";
 
-    const filtered = allItems.filter((it) => activeTypes.has(it.type) && isVisible(it));
+    const filtered = allItems.filter((it) => activeTypes.has(displayType(it)) && isVisible(it));
     // Ei vielä mennyt (määräaika >= tänään) jaetaan omaan osioonsa tilan
     // mukaan, jotta "Työn alla"/"Tehty"/"Ei tehdä" -merkityt eivät sotke
     // avointen tehtävien listaa. Mennyt (< tänään) näkyy silti aina
@@ -2447,7 +2467,7 @@
 
         const progLabel = document.createElement("div");
         progLabel.className = "progress-label";
-        progLabel.innerHTML = "<span>" + status + "</span><span>" + course.start.slice(5) + " – " + course.end.slice(5) + "</span>";
+        setProgressLabel(progLabel, status, course.start.slice(5) + " – " + course.end.slice(5));
         card.appendChild(progLabel);
       }
 
@@ -2759,7 +2779,7 @@
 
       const progLabel = document.createElement("div");
       progLabel.className = "progress-label";
-      progLabel.innerHTML = "<span>" + status + "</span><span>" + course.start + " – " + course.end + "</span>";
+      setProgressLabel(progLabel, status, course.start + " – " + course.end);
       header.appendChild(progLabel);
     }
 
@@ -2972,7 +2992,7 @@
     if (!hours || !pace) return null;
     const deadlineDate = parseDate(effDate(item));
     const weeksNeeded = hours / pace;
-    const startDate = new Date(deadlineDate.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+    const startDate = addDays(deadlineDate, -Math.round(weeksNeeded * 7));
     return { startDate, deadlineDate };
   }
 
@@ -3007,10 +3027,10 @@
       } else if (avail.status === "none") {
         bars.push({ item: it, startDate: windowStart, deadlineDate: windowEnd, kind: "examwin-closed" });
       } else {
-        const bookableUntil = new Date(today.getTime() + EXAM_BOOKING_HORIZON_DAYS * 86400000);
+        const bookableUntil = addDays(today, EXAM_BOOKING_HORIZON_DAYS);
         const openEnd = bookableUntil < windowEnd ? bookableUntil : windowEnd;
         bars.push({ item: it, startDate: windowStart, deadlineDate: openEnd, kind: "examwin-open" });
-        const closedStart = new Date(openEnd.getTime() + 86400000);
+        const closedStart = addDays(openEnd, 1);
         if (closedStart <= windowEnd) {
           bars.push({ item: it, startDate: closedStart, deadlineDate: windowEnd, kind: "examwin-closed" });
         }
@@ -3228,7 +3248,7 @@
 
   function renderWeek() {
     const monday = getWeekMonday(weekOffset);
-    const sunday = new Date(monday.getTime() + 6 * 86400000);
+    const sunday = addDays(monday, 6);
     document.getElementById("weekTitle").textContent =
       fmtShort(monday) + " – " + sunday.toLocaleDateString("fi-FI", { day: "numeric", month: "numeric", year: "numeric" });
 
@@ -3252,7 +3272,9 @@
         input.value = v;
         capacityArr[idx] = v;
         saveCapacityMap(capacityArr);
-        renderWeek();
+        // Viivästetty: muuten samaan aikaan klikattu nappi (esim. "Ei
+        // opiskella") katoaa alta, kun näkymä rakennetaan uudelleen.
+        setTimeout(renderWeek, 0);
       };
       cell.appendChild(label);
       cell.appendChild(input);
@@ -3281,8 +3303,13 @@
     const noEstEl = document.getElementById("weekNoEstimate");
     if (noEstimate.length) {
       noEstEl.hidden = false;
-      noEstEl.innerHTML = "<strong>Ei aika-arviota, ei aikataulutettu:</strong> " +
-        noEstimate.map((it) => displayTitle(it) + " (" + it.courseName + ")").join(", ");
+      noEstEl.textContent = "";
+      const strong = document.createElement("strong");
+      strong.textContent = "Ei aika-arviota, ei aikataulutettu:";
+      noEstEl.appendChild(strong);
+      noEstEl.appendChild(
+        document.createTextNode(" " + noEstimate.map((it) => displayTitle(it) + " (" + it.courseName + ")").join(", "))
+      );
     } else {
       noEstEl.hidden = true;
     }
@@ -3291,7 +3318,7 @@
     grid2.innerHTML = "";
     const todayIso = toIsoDate(today);
     for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(monday.getTime() + i * 86400000);
+      const dayDate = addDays(monday, i);
       const iso = toIsoDate(dayDate);
       const isPast = dayDate < today;
       const col = document.createElement("div");
@@ -3736,12 +3763,21 @@
       return;
     }
     const m = location.hash.match(/^#kurssi\/(.+)$/);
-    const course = m ? courseById[decodeURIComponent(m[1])] : null;
+    let courseId = null;
+    if (m) {
+      try {
+        courseId = decodeURIComponent(m[1]);
+      } catch {
+        courseId = null; // rikkinäinen osoite -> dashboard
+      }
+    }
+    const course = courseId ? courseById[courseId] : null;
     if (course) showProfile(course);
     else showDashboard();
   }
 
   function refresh() {
+    today = startOfToday();
     rebuildAllItems();
     route();
   }
@@ -3806,7 +3842,9 @@
     noneOpt.value = "";
     noneOpt.textContent = "Ei kurssia";
     select.appendChild(noneOpt);
-    COURSES.filter((c) => getCourseState(c.id) !== "hidden").forEach((c) => {
+    // Piilotetut kurssit jätetään pois, paitsi jos tehtävä kuuluu jo sellaiseen:
+    // muuten tallennus irrottaisi tehtävän kurssistaan huomaamatta.
+    COURSES.filter((c) => getCourseState(c.id) !== "hidden" || c.id === selectedCourseId).forEach((c) => {
       const opt = document.createElement("option");
       opt.value = c.id;
       opt.textContent = c.name;
@@ -4014,6 +4052,11 @@
       // Tehtäviä löytyi, mutta yhdestäkään ei tunnistettu päivämäärää:
       // lähes aina merkki siitä, ettei Moodlen sivua osattu jäsentää.
       text = courses + " kurssia ja " + acts + " tehtävää tarkistettu, mutta yhdeltäkään ei tunnistettu määräaikaa";
+      isWarn = true;
+    } else if (!acts && !(s.dueFound || 0) && !news.length) {
+      // Kurssisivut saatiin, mutta niiltä ei löytynyt yhtään tehtävää:
+      // todennäköisesti Moodlen sivurakenne on muuttunut.
+      text = courses + " kurssia tarkistettu, mutta niiltä ei löytynyt yhtään tehtävää";
       isWarn = true;
     } else {
       text =
