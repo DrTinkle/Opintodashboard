@@ -67,17 +67,21 @@ npm-asennuksia.
    - **Oma Moodle-käyttäjä-id:** numero, jonka näet Moodlessa oman
      profiilisivusi osoitteesta (`user/profile.php?id=12345`). Tarvitaan
      uusien kurssien löytämiseen.
+   - **Ryhmätunnus** (esim. `AIC25SP`): kurssien opintopisteet,
+     päivämäärät ja opettajat haetaan sen avulla SAMKin opinto-oppaasta.
 
    Paina **Tallenna muutokset**.
 2. **Paina yläpalkin "Hae Moodlesta".** Ensimmäinen haku kestää pari
    minuuttia, minkä jälkeen kurssisi ja niiden tehtävät näkyvät
-   dashboardilla.
+   dashboardilla. Kurssien tiedot (op, päivämäärät, koodi, opettaja)
+   täydentyvät samalla automaattisesti SAMKin opinto-oppaasta.
 3. **Poista esimerkkikurssit** ("Ohjelmoinnin perusteet" ja "Tietokannat")
    kurssikortin **Poista**-napilla.
-4. **Täydennä uusien kurssien tiedot:** Moodlesta löytyneet kurssit saavat
-   merkinnän "Täydennä tiedot", koska Moodle ei kerro opintopisteitä eikä
-   kurssin kestoa. Lisää ne `data.json`:iin (`credits`, `teacher`,
-   `start`, `end`) ja aja `npm run build`.
+4. **Jos kurssilla näkyy "Täydennä tiedot"**, sitä ei löytynyt
+   opinto-oppaasta (esim. Library Moodle, joka ei ole oikea kurssi).
+   Piilota se kurssikortin Poista-napilla, tai lisää tiedot käsin
+   `data.json`:iin (`credits`, `teacher`, `start`, `end`) ja aja
+   `npm run build`.
 
 ## Käyttö lyhyesti
 

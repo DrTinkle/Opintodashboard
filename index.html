@@ -3478,10 +3478,22 @@
     {
       id: "google",
       title: "Google-kalenterisynkka",
-      hint: "OAuth-clientin tiedot Google Cloud Consolesta, ks. README.md:n osio \"Google-kalenterisynkka\".",
+      hint: "OAuth-clientin tiedot Google Cloud Consolesta, ks. ohje docs/google-kalenteri.md.",
       fields: [
         { key: "GOOGLE_CLIENT_ID", label: "Client ID", password: true },
         { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", password: true },
+      ],
+    },
+    {
+      id: "catalog",
+      title: "Kurssitiedot opinto-oppaasta",
+      optionalBadge: "Suositeltu",
+      hint:
+        "Moodlesta löytyneiden kurssien opintopisteet, päivämäärät, kurssikoodi ja opettaja " +
+        "haetaan automaattisesti SAMKin julkisesta opinto-oppaasta. Ryhmätunnuksen avulla " +
+        "löytyy juuri sinun ryhmäsi toteutus.",
+      fields: [
+        { key: "SAMK_GROUP", label: "Ryhmätunnus", sub: "Esim. AIC25SP. Näet sen lukujärjestyksestä tai Pepistä." },
       ],
     },
     {
@@ -3946,6 +3958,7 @@
       try { localStorage.setItem(SYNC_LAST_RUN_KEY, new Date().toISOString()); } catch (e) {}
 
       const parts = [s.newCourses.length + " uutta kurssia", s.newTasks.length + " uutta tehtävää"];
+      if (s.catalogFilled && s.catalogFilled.length) parts.push(s.catalogFilled.length + " kurssin tiedot täydennetty");
       if (s.errors && s.errors.length) parts.push(s.errors.length + " virhettä");
       statusEl.textContent = parts.join(", ") + ".";
       statusEl.className = "sync-status " + (s.errors && s.errors.length ? "sync-error" : "sync-ok");
@@ -3958,7 +3971,10 @@
         if (s.newTasks.length) {
           detail +=
             "Uudet tehtävät:\n" +
-            s.newTasks.map((t) => "- [" + t.courseName + "] " + t.title + " (" + t.date + ")").join("\n");
+            s.newTasks.map((t) => "- [" + t.courseName + "] " + t.title + " (" + t.date + ")").join("\n") + "\n\n";
+        }
+        if (s.catalogFilled && s.catalogFilled.length) {
+          detail += "Kurssitiedot täydennetty opinto-oppaasta:\n" + s.catalogFilled.map((c) => "- " + c.name).join("\n");
         }
         if (detail.trim()) alert(detail.trim());
         location.reload();

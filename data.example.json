@@ -2,7 +2,7 @@
   {
     "id": "esimerkkikurssi1",
     "name": "Ohjelmoinnin perusteet",
-    "code": "OH101",
+    "code": "ESIM101",
     "credits": 5,
     "teacher": "Etunimi Sukunimi",
     "color": "#3b82f6",
@@ -29,7 +29,7 @@
   {
     "id": "esimerkkikurssi2",
     "name": "Tietokannat",
-    "code": "TK202",
+    "code": "ESIM202",
     "credits": 4,
     "teacher": "Etunimi Sukunimi",
     "color": "#16a34a",

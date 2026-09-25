@@ -15,9 +15,10 @@ ovat [README.md](../README.md):ssä ja koodin muokkaamisen säännöt
 7. [Skriptit ja komentorivi](#skriptit-ja-komentorivi)
 8. [Laskentalogiikka](#laskentalogiikka)
 9. [Moodle-integraatio](#moodle-integraatio)
-10. [Google-synkka](#google-synkka)
-11. [DeepSeek-arviot](#deepseek-arviot)
-12. [Tunnetut rajoitukset](#tunnetut-rajoitukset)
+10. [SAMK opinto-opas](#samk-opinto-opas)
+11. [Google-synkka](#google-synkka)
+12. [DeepSeek-arviot](#deepseek-arviot)
+13. [Tunnetut rajoitukset](#tunnetut-rajoitukset)
 
 ## Arkkitehtuuri
 
@@ -59,6 +60,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data.json ──(build.js)─�
 | `scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`) |
 | `find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
 | `find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `deadline_scan.json` tarkistettavaksi |
+| `samk_catalog.js` | Täydentää kurssien puuttuvat tiedot SAMKin julkisesta opinto-oppaasta |
 | `refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
 | `estimate_deepseek.js` | Tuntiarvio uusille tehtäville DeepSeekin API:lla |
 | `sync_to_google.js` | Vienti Google Tasksiin ja Google-kalenteriin |
@@ -154,6 +156,7 @@ näkyy heti uudelleenlatauksella.
 | `MOODLE_USERNAME`, `MOODLE_PASSWORD` | Automaattinen kirjautuminen (`refresh_moodle_session.js`) |
 | `MOODLE_SESSION` | Moodlen istuntoeväste; uusitaan automaattisesti, jos tunnukset on asetettu |
 | `MOODLE_USERID` | Oma käyttäjä-id, tarvitaan profiilisivun kurssilistaan |
+| `SAMK_GROUP` | Ryhmätunnus (esim. `AIC25SP`), opinto-oppaan toteutuksen valintaan |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth -asiakas |
 | `DEEPSEEK_API_KEY` | Valinnainen tuntiarvioihin |
 
@@ -171,6 +174,7 @@ npm run build                              # data.json -> data.js
 npm run sync:moodle                        # node sync_moodle.js [--delay 500] [--userid N]
 npm run sync:google                        # ks. docs/google-kalenteri.md
 npm run find-ids                           # node find_moodle_ids.js [--dry-run] [--userid N]
+npm run catalog                            # node samk_catalog.js [--dry-run]
 
 node update_from_moodle.js --url "<ICS-vientilinkki>" [--dry-run]
 node update_from_moodle.js --file kalenteri.ics
@@ -243,6 +247,32 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - **Roskakurssit:** esim. "Library Moodle" näkyy profiilin kurssilistassa;
   piilota se kurssikortista.
 
+## SAMK opinto-opas
+
+`samk_catalog.js` täydentää kurssien puuttuvat kentät (`code`, `credits`,
+`start`, `end`, `teacher`) SAMKin julkisesta opinto-oppaasta
+(https://samk.opinto-opas.fi). Se ajetaan automaattisesti jokaisen
+"Hae Moodlesta" -synkan yhteydessä, ja käsin `npm run catalog`.
+
+- **Rajapinta:** opinto-oppaan oma taustarajapinta `/app/rest/`, ei
+  kirjautumista. Dokumentoimaton, joten se voi muuttua; virhe kirjataan
+  synkan virheisiin eikä kaada mitään.
+  - `GET unit/degreeprogramme`: koulutusohjelmat (`id`, `code`, esim. `IC`)
+  - `POST realization` (`{year, degreeProgrammeId, ...}`): ohjelman
+    toteutukset lukuvuodelta, enintään 500 kerrallaan
+  - `GET realization/<id>`: toteutuksen tiedot (`minCredits`/`maxCredits`,
+    `startDate`, `endDate`, `teachers`, `groups`)
+- **Koulutusohjelma** päätellään `SAMK_GROUP`:sta (`AIC25SP` -> `IC`) ja
+  kurssikoodien etuliitteistä (`IC250105-3002` -> `IC`). Haetaan kuluva ja
+  edellinen lukuvuosi (lukuvuosi vaihtuu elokuussa).
+- **Kurssin tunnistus:** ensin koodilla (toteutus- tai opintojaksokoodi),
+  sitten nimellä. Useista toteutuksista valitaan oman ryhmän toteutus
+  (`SAMK_GROUP` tai yleisin ryhmä kursseilla, joilla on jo koodi) ja sitten
+  se, joka on käynnissä kurssin alkaessa tai tänään. Jos valinta ei silti
+  ole yksiselitteinen, täytetään vain kaikissa vaihtoehdoissa samat arvot.
+- **Ei ylikirjoitusta:** vain puuttuvat kentät täytetään. `needsInfo`
+  poistetaan, kun opintopisteet ja päivämäärät ovat tiedossa.
+
 ## Google-synkka
 
 - `task` menee Google Tasksiin, muut tyypit Google-kalenteriin koko päivän
@@ -273,3 +303,4 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - Moodlen sivurakenteen muutos voi rikkoa jäsennyksen; käytä
   `debug_fetch_page.js`:ää vianetsintään.
 - Kaikki Moodle-osoitteet olettavat SAMKin Moodlen (`moodle5.samk.fi`).
+- Opinto-oppaan rajapinta on dokumentoimaton ja voi muuttua ilman ilmoitusta.

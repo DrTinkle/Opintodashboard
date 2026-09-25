@@ -357,6 +357,18 @@ async function runSync(opts = {}) {
   if (courseResult.error) summary.errors.push(courseResult.error);
   summary.newCourses = courseResult.newCourses || [];
 
+  // Puuttuvat kurssitiedot (koodi, op, päivät, opettaja) SAMKin
+  // opinto-oppaasta. Valinnainen: virhe ei kaada synkkaa.
+  summary.catalogFilled = [];
+  try {
+    const { enrichFromCatalog } = require("./samk_catalog.js");
+    summary.catalogFilled = await enrichFromCatalog(data, {
+      log: (m) => summary.errors.push(m),
+    });
+  } catch (err) {
+    summary.errors.push("Opinto-oppaan haku epäonnistui: " + err.message);
+  }
+
   const scannable = data.filter((c) => c.moodleId);
   for (let i = 0; i < scannable.length; i++) {
     await scanCourseForNewDeadlines(scannable[i], session, opts.baseUrl, opts, summary);
@@ -367,7 +379,8 @@ async function runSync(opts = {}) {
     if (c.deadlines) c.deadlines.sort((a, b) => a.date.localeCompare(b.date));
   });
 
-  summary.changed = summary.newCourses.length > 0 || summary.newTasks.length > 0;
+  summary.changed =
+    summary.newCourses.length > 0 || summary.newTasks.length > 0 || summary.catalogFilled.length > 0;
   if (summary.changed) {
     fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
     execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
@@ -394,8 +407,10 @@ if (require.main === module) {
       console.log("\nValmis.");
       console.log(`Uusia kursseja: ${summary.newCourses.length}`);
       summary.newCourses.forEach((c) =>
-        console.log(`  + [${c.id}] ${c.name} (moodleId ${c.moodleId}) - täydennä tiedot data.json:iin`)
+        console.log(`  + [${c.id}] ${c.name} (moodleId ${c.moodleId})`)
       );
+      console.log(`Kurssitietoja täydennetty opinto-oppaasta: ${summary.catalogFilled.length}`);
+      summary.catalogFilled.forEach((c) => console.log(`  * ${c.name}: ${c.fields.join(", ")}`));
       console.log(`Uusia tehtäviä: ${summary.newTasks.length}`);
       summary.newTasks.forEach((t) => console.log(`  + [${t.course}] ${t.title} (${t.date})`));
       console.log(`Kursseja skannattu: ${summary.coursesScanned}, aktiviteetteja tarkistettu: ${summary.activitiesScanned}`);
