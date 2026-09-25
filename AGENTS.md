@@ -62,6 +62,14 @@ yksityiskohdat.
   Moodle-skriptejä ei voi ajaa ympäristössä, jolla ei ole pääsyä
   `moodle5.samk.fi`:hin; testaa jäsennys tallennetulla HTML:llä
   (`debug_fetch_page.js`) tai mockatulla `fetch`:llä.
+- **Opinto-opas** (`samk_catalog.js`) käyttää dokumentoimatonta
+  rajapintaa. Pidä se valinnaisena: virhe kirjataan synkan virheisiin eikä
+  kaada mitään, ja vain puuttuvat kentät täytetään.
+- **Synkan yhteenveto:** `sync_moodle.js`:n `summary`-kentät
+  (`coursesScanned`, `dueFound`, `alreadyKnown`, `courses` ...) ja
+  `index.html`:n `describeSync()` kuuluvat yhteen. Jos muutat toista,
+  päivitä toinen. "0 uutta" ei saa koskaan näyttää onnistumiselta, jos
+  mitään ei oikeasti tarkistettu.
 - **Windows:** käyttäjät ovat enimmäkseen Windowsilla. Älä käytä
   `cmd /c start`:ia URL:ien avaamiseen (katkaisee `&`-merkkiin), ja pidä
   `.bat`-tiedostot CRLF-muodossa ja ASCII-merkeissä.
@@ -79,6 +87,8 @@ Ennen committia:
    kurssisivu) vaaleassa ja tummassa teemassa sekä noin 375 px leveällä
    näytöllä. Selaimen konsolissa ei saa olla virheitä.
 4. Jos muutos koskee tallennusta, testaa myös sivun uudelleenlataus.
+5. Moodle-synkan muutokset: aja synkka ja tarkista `sync_report.json`,
+   jossa näkyy jokainen löydetty tehtävä ja mihin se täsmättiin.
 
 ## Dokumentaatio
 

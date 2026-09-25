@@ -16,6 +16,8 @@ npm-asennuksia.
 - **Kurssisivut:** kurssin tehtävät, tenttitiedot ja Moodlesta haettu
   sisältö.
 - **Hae Moodlesta:** uudet kurssit ja tehtävät löytyvät automaattisesti.
+- **Kurssitiedot opinto-oppaasta:** opintopisteet, päivämäärät, kurssikoodi
+  ja opettaja haetaan SAMKin julkisesta opinto-oppaasta.
 - **Vie Googleen** (valinnainen): deadlinet Google-kalenteriin ja
   Google Tasksiin.
 - **DeepSeek-tuntiarviot** (valinnainen): automaattinen aika-arvio uusille
@@ -97,6 +99,9 @@ npm-asennuksia.
   EXAM-päivän.
 - **Viikko:** aseta jokaiselle viikonpäivälle, montako tuntia ehdit
   opiskella, niin näet mitä kunakin päivänä kannattaa tehdä.
+- **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja
+  tehtävää tarkistettiin ja montako määräaikaa Moodlesta löytyi. Vie hiiri
+  tekstin päälle nähdäksesi erittelyn kursseittain.
 
 > **Huom:** tilat, arviot, omat tehtävät ja muut merkinnät tallentuvat
 > selaimen muistiin. Ne eivät siirry toiselle koneelle tai toiseen
@@ -120,6 +125,8 @@ npm-asennuksia.
   gitistä. Älä silti jaa niitä kenellekään.
 - Salasana tallennetaan `.env`:iin selkokielisenä. Jos et halua sitä,
   käytä pelkkää MoodleSession-evästettä.
+- Opinto-oppaan haut ovat julkisia eivätkä vaadi kirjautumista. Niissä
+  lähetetään vain koulutusohjelman tunnus, ei henkilötietoja.
 
 ## Ongelmatilanteita
 
@@ -132,6 +139,12 @@ npm-asennuksia.
   hae uusi.
 - **Uusia kursseja ei löydy:** tarkista, että oma Moodle-käyttäjä-id on
   asetettu.
+- **"0 uutta" epäilyttää:** tila kertoo, montako kurssia ja määräaikaa
+  tarkistettiin. Jos mitään ei voitu tarkistaa, se näkyy punaisena
+  virheenä. Täysi raportti jokaisesta löydetystä tehtävästä on tiedostossa
+  `sync_report.json`.
+- **Kurssin tiedot puuttuvat:** tarkista, että ryhmätunnus on asetettu.
+  Opinto-oppaassa ei ole kaikkia opintoja (esim. Library Moodle).
 
 ## Kehittäjille
 

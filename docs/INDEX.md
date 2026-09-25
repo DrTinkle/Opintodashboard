@@ -176,7 +176,7 @@ npm run sync:google                        # ks. docs/google-kalenteri.md
 npm run find-ids                           # node find_moodle_ids.js [--dry-run] [--userid N]
 npm run catalog                            # node samk_catalog.js [--dry-run]
 
-node update_from_moodle.js --url "<ICS-vientilinkki>" [--dry-run]
+node update_from_moodle.js --url "<ICS-vientilinkki>" [--dry-run] [--debug]
 node update_from_moodle.js --file kalenteri.ics
 node scrape_course_content.js [--course <moodleId>] [--dry-run] [--debug] [--delay ms]
 node find_deadlines.js [--course=<id>] [--delay=ms]
