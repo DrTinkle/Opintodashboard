@@ -34,17 +34,41 @@ const { estimateWithDeepSeek } = require("./estimate_deepseek.js");
 const DATA_JSON = path.join(__dirname, "data.json");
 const DATA_JS = path.join(__dirname, "data.js");
 
-// Avainsanat joilla Moodle-tapahtuman otsikosta (SUMMARY) tunnistetaan kurssi.
-// Lisää tähän rivi jos uusi kurssi ei löydy Moodlen tapahtumista automaattisesti.
-const COURSE_KEYWORDS = {
-  pilviteknologiat: ["pilviteknologia"],
-  fyslab: ["fysiikan laboraatio", "fyslab"],
-  tito: ["tietoturvallinen ohjelmistotuotanto"],
-  htmlcss: ["tiedon esittäminen", "html ja css"],
-  relaatiotietokanta: ["relaatiotietokanta"],
-  minaoy: ["minä oy", "toiminnallisen yrittäjyyden"],
-  difis: ["differentiaali- ja integraalilaskenta", "differentiaalilaskenta"],
-};
+// Kurssin tunnistus tehdään kokonaan data.json:in perusteella, joten skripti
+// toimii kenen tahansa kursseilla ilman koodimuutoksia (ks. matchCourse):
+//   1) kurssikoodi tai koko nimi tapahtuman CATEGORIES-kentässä (SAMKin
+//      Moodle laittaa sinne kurssin lyhytnimen, joka sisältää koodin)
+//   2) kurssin omat avainsanat data.json:in valinnaisesta
+//      "moodleKeywords"-kentästä, esim. "moodleKeywords": ["html ja css"]
+//   3) kurssin nimen sanat tapahtuman otsikossa (taivutusmuodot sallitaan);
+//      osuma hyväksytään vain, jos yksi kurssi on selvästi paras
+// Jos jokin kurssi ei tunnistu, lisää sille data.json:iin moodleKeywords.
+
+// Kurssinimien sanat, jotka eivät erota kursseja toisistaan.
+const GENERIC_COURSE_WORDS = new Set([
+  "and", "the", "for", "with", "sekä", "moodle", "perusteet", "johdanto",
+  "jatkokurssi", "kurssi", "opintojakso", "projekti", "seminaari", "työpaja",
+]);
+
+function normalizeText(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[()"“”,.:;!?\/\\–—-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function courseNameWords(course) {
+  return normalizeText(course.name)
+    .split(" ")
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !GENERIC_COURSE_WORDS.has(w) && !GENERIC_WORDS.has(w));
+}
+
+// Suomen taivutus: sanan alkuosa riittää ("pilviteknologiat" tunnistuu
+// myös tekstistä "Pilviteknologia", "laboraatiot" tekstistä "laboraatio").
+function wordStem(w) {
+  return w.slice(0, Math.max(5, Math.ceil(w.length * 0.8)));
+}
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -120,12 +144,38 @@ function matchCourse(ev, data) {
       if (categories.includes(course.name.toLowerCase())) return course.id;
     }
   }
-  // 3) Muuten yritä tunnistaa otsikosta avainsanalistalla.
-  const lower = (ev.summary || "").toLowerCase();
-  for (const [id, keywords] of Object.entries(COURSE_KEYWORDS)) {
-    if (keywords.some((k) => lower.includes(k))) return id;
+  const haystack = normalizeText((ev.summary || "") + " " + (ev.categories || ""));
+  const tokens = haystack.split(" ");
+
+  // 2) Kurssin omat avainsanat data.json:ista.
+  for (const course of data) {
+    const kws = Array.isArray(course.moodleKeywords) ? course.moodleKeywords : [];
+    if (kws.some((k) => normalizeText(k) && haystack.includes(normalizeText(k)))) return course.id;
   }
-  return null;
+
+  // 3) Kurssin nimen sanat. Pisteenä osumien osuus nimen sanoista; hyväksytään
+  //    jos vähintään puolet sanoista osuu tai osuu jokin pitkä (>= 10 merkkiä)
+  //    ja siksi yksilöivä sana. Tasapelissä ei arvata.
+  let best = null;
+  let bestScore = 0;
+  let tie = false;
+  for (const course of data) {
+    const words = courseNameWords(course);
+    if (!words.length) continue;
+    const hitWords = words.filter((w) => tokens.some((t) => t.startsWith(wordStem(w))));
+    if (!hitWords.length) continue;
+    const distinctive = hitWords.some((w) => w.length >= 10);
+    if (hitWords.length / words.length < 0.5 && !distinctive) continue;
+    const score = hitWords.length / words.length + hitWords.length * 0.01;
+    if (score > bestScore) {
+      best = course.id;
+      bestScore = score;
+      tie = false;
+    } else if (score === bestScore) {
+      tie = true;
+    }
+  }
+  return best && !tie ? best : null;
 }
 
 // Yleiset Moodle-fraasit joita ei kannata käyttää tunnistamaan onko kaksi
@@ -167,10 +217,14 @@ function isSameDeadline(existingTitle, incomingTitle) {
   return incomingWords.some((w) => existingWords.has(w));
 }
 
-function guessType(summary, courseId) {
+function isLabCourse(course) {
+  return /laboraatio|labra/i.test((course && course.name) || "");
+}
+
+function guessType(summary, course) {
   const lower = summary.toLowerCase();
   if (lower.includes("tentti") || lower.includes("exam")) return "exam";
-  if (courseId === "fyslab" || lower.includes("labra")) return "lab";
+  if (isLabCourse(course) || lower.includes("labra")) return "lab";
   if (
     lower.includes("määräpäivä") ||
     lower.includes("due") ||
@@ -234,7 +288,7 @@ async function main() {
     const newDeadline = {
       title: ev.summary,
       date,
-      type: guessType(ev.summary, courseId),
+      type: guessType(ev.summary, course),
       notes: ev.description || "",
     };
     // DeepSeek-aika-arvio VAIN aidosti uudelle deadlinelle (sama periaate
@@ -259,7 +313,8 @@ async function main() {
       console.log("  - " + ev.summary + (ev.categories ? "   [categories: " + ev.categories + "]" : "   [ei categories-kenttää]"));
     });
     console.log('\nAja uudelleen lipulla "--debug" nähdäksesi jokaisen tapahtuman kaikki kentät (categories/url/desc),');
-    console.log("niin näet miten kurssi olisi pitänyt tunnistaa, ja voit lisätä sen COURSE_KEYWORDS-listaan.");
+    console.log('niin näet miten kurssi olisi pitänyt tunnistaa. Lisää sitten kurssille data.json:iin esim.');
+    console.log('"moodleKeywords": ["sana joka esiintyy tapahtuman otsikossa"] ja aja uudelleen.');
   }
 
   if (args.dryRun) {
@@ -276,7 +331,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Virhe:", err.message);
-  process.exit(1);
-});
+module.exports = { parseIcs, matchCourse, guessType, isSameDeadline, icsDateToIso };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Virhe:", err.message);
+    process.exit(1);
+  });
+}

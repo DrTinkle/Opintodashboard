@@ -89,6 +89,7 @@ Generoidut ja henkilökohtaiset tiedostot (`data.json`, `data.js`, `.env`,
 | `links` | `[{label, url}]` | Kurssikortin linkit |
 | `topics` | `[{name, summary, items: [{title, url, type, content}]}]` | Moodlesta haettu sisältö |
 | `needsInfo` | boolean | Synkan lisäämä kurssi, josta puuttuu tietoja |
+| `moodleKeywords` | string[] (valinnainen) | Lisäsanat, joilla ICS-tuonti tunnistaa kurssin tapahtumat, esim. `["html ja css"]` |
 | `deadlines` | taulukko | Ks. alla |
 
 **Deadline**
@@ -222,6 +223,20 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   "Opened:"/"Due:"-rivit englanniksi. Monella quiz-tyyppisellä
   harjoituksella ei ole muodollista määräaikaa; sellaiset jätetään
   lisäämättä.
+- **ICS-tuonnin kurssitunnistus** (`update_from_moodle.js`, `matchCourse()`)
+  perustuu kokonaan `data.json`:iin, ei kovakoodattuihin kursseihin:
+  1. kurssikoodi tai koko nimi tapahtuman CATEGORIES-kentässä (SAMKin
+     Moodle laittaa sinne kurssin lyhytnimen, joka sisältää koodin),
+  2. kurssin `moodleKeywords`,
+  3. kurssin nimen sanat tapahtuman otsikossa. Sanan alkuosa riittää
+     (taivutusmuodot), ja osuma hyväksytään, jos vähintään puolet nimen
+     sanoista osuu tai osuu jokin pitkä, yksilöivä sana. Tasapelissä
+     tapahtumaa ei liitetä mihinkään.
+
+  Tunnistamattomat tapahtumat tulostetaan; `--debug` näyttää niiden
+  kaikki kentät, ja korjaus on lisätä kurssille `moodleKeywords`.
+- **Labrat:** tyypiksi tulee `lab`, jos kurssin nimessä on "laboraatio"
+  tai "labra" tai tehtävän otsikossa "labra".
 - **Duplikaatit:** otsikot verrataan merkitsevien sanojen perusteella
   (`isSameDeadline()`); pelkät numerot säilytetään aina, jotta
   "Viikkotehtävä 1" ja "Viikkotehtävä 2" eivät sekoitu.

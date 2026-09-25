@@ -160,7 +160,7 @@ function guessDeadlineType(item, course) {
   ) {
     return "exam";
   }
-  if (course.id === "fyslab" || lower.includes("labra")) return "lab";
+  if (/laboraatio|labra/i.test(course.name || "") || lower.includes("labra")) return "lab";
   return "task";
 }
 

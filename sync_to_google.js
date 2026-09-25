@@ -14,7 +14,7 @@
 // KAYTTO:
 //   node sync_to_google.js                    # kirjautuu tarv. selaimen kautta, synkkaa kaiken
 //   node sync_to_google.js --dry-run          # nayttaa mita tehtaisiin, ei muuta mitaan
-//   node sync_to_google.js --course pilviteknologiat   # vain yksi kurssi
+//   node sync_to_google.js --course <kurssin-id>       # vain yksi kurssi
 //   node sync_to_google.js --tasklist "Oma lista" --calendar "Oma kalenteri"
 //   node sync_to_google.js --logout           # poistaa tallennetun kirjautumisen (token.json)
 //

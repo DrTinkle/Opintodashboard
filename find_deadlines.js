@@ -15,7 +15,7 @@
 //
 // Kaytto:
 //   node find_deadlines.js                  # skannaa kaikkien kurssien assign/quiz-kohteet
-//   node find_deadlines.js --course=tito     # vain yksi kurssi (data.json:in id-kentta)
+//   node find_deadlines.js --course=<id>     # vain yksi kurssi (data.json:in id-kentta)
 //   node find_deadlines.js --delay=500       # viive pyyntojen valissa ms (oletus 300)
 
 const fs = require("fs");
