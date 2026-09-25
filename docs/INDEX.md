@@ -87,6 +87,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 | `src/moodle/update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |
 | `src/moodle/scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`), Moodle-sivujen haku |
 | `src/moodle/find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
+| `src/moodle/exam_windows.js` | EXAM-tenttien varausikkunat kurssin Moodle-tekstistä (synkka käyttää) |
 | `src/moodle/find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `data/deadline_scan.json` tarkistettavaksi |
 | `src/moodle/refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
 | `src/moodle/debug_fetch_page.js` | Vianetsintä: tallentaa yhden Moodle-sivun `debug/`-kansioon |
@@ -280,6 +281,16 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   kaikki kentät, ja korjaus on lisätä kurssille `moodleKeywords`.
 - **Labrat:** tyypiksi tulee `lab`, jos kurssin nimessä on "laboraatio"
   tai "labra" tai tehtävän otsikossa "labra".
+- **EXAM-tentit** (`exam_windows.js`): EXAM-järjestelmä (exam5x.samk.fi)
+  on Moodlesta erillinen, joten EXAM-tenteillä ei ole Moodle-aktiviteettia.
+  Varausikkuna luetaan kurssin tekstistä (osioiden kuvaukset, tekstit ja
+  sivut): rivi, jolla on päivämääräväli ("12.10.-1.11.2026",
+  "7.–22.11.2026", kaksi täyttä päivämäärää) ja jolla tai edellisellä
+  rivillä on EXAM-linkki tai sana "tentti"/"exam". Kurssin tekstissä pitää
+  mainita EXAM. Uusintatentit ohitetaan. Tulokseksi deadline
+  "Tentti (EXAM-ikkuna)", päivänä ikkunan loppu, `examWindowStart`/`End`
+  asetettuna; käyttöliittymä näyttää sen EXAM-tyyppisenä. Jos ikkunaa ei ole
+  vielä kirjoitettu Moodleen, sitä ei löydy.
 - **Duplikaatit:** synkan lisäämä deadline tallentaa aktiviteettinsa
   osoitteen (`moodleUrl`) ja täsmää jatkossa vain siihen. Käsin lisätyt
   verrataan samana päivänä otsikon merkitsevien sanojen perusteella

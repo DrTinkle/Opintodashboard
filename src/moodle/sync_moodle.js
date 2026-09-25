@@ -47,6 +47,7 @@ const {
   SCANNABLE_TYPES,
 } = require("./find_deadlines.js");
 const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js");
+const { findExamWindows } = require("./exam_windows.js");
 
 // REPORT_PATH (data/sync_report.json): viimeisimmän synkan yksityiskohtainen
 // raportti (mitä Moodlesta löytyi ja mihin se täsmättiin). Ei jaeta.
@@ -390,6 +391,55 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
         date: isoDate,
       });
     }
+  }
+
+  await addExamWindows(course, topics, summary, stat);
+}
+
+function fiDate(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return d + "." + m + "." + y;
+}
+
+// EXAM-tentit eivät ole Moodle-aktiviteetteja, joten niiden varausikkuna
+// luetaan kurssin tekstistä (ks. exam_windows.js). Määräaika on ikkunan
+// viimeinen päivä. Sama ikkuna tunnistetaan jo listalla olevaksi, jos
+// kurssilla on deadline samalla ikkunalla tai tentti samana päivänä.
+async function addExamWindows(course, topics, summary, stat) {
+  const title = "Tentti (EXAM-ikkuna)";
+  for (const w of findExamWindows(topics)) {
+    stat.withDue++;
+    summary.dueFound++;
+    const match = course.deadlines.find(
+      (d) =>
+        (d.examWindowStart === w.start && d.examWindowEnd === w.end) ||
+        (d.type === "exam" && d.date === w.end)
+    );
+    if (match) {
+      stat.known++;
+      summary.alreadyKnown++;
+      stat.items.push({ title, date: w.end, status: "known", matchedTo: match.title, source: "exam" });
+      continue;
+    }
+    const newDeadline = {
+      title,
+      date: w.end,
+      type: "exam",
+      notes:
+        "EXAM-varausikkuna " + fiDate(w.start) + " - " + fiDate(w.end) + " (kurssin Moodle-sivulta)." +
+        (w.link ? " Ilmoittautuminen: " + w.link : ""),
+      examWindowStart: w.start,
+      examWindowEnd: w.end,
+    };
+    const estimate = await estimateWithDeepSeek(course, newDeadline);
+    if (estimate) {
+      newDeadline.estimatedHours = estimate.estimatedHours;
+      newDeadline.estimatedPace = estimate.estimatedPace;
+    }
+    course.deadlines.push(newDeadline);
+    stat.added++;
+    stat.items.push({ title, date: w.end, status: "new", source: "exam" });
+    summary.newTasks.push({ course: course.id, courseName: course.name, title, date: w.end });
   }
 }
 
