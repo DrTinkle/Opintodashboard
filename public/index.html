@@ -832,12 +832,13 @@
   }
   .calendar-day .day-num.weekend { color: var(--text-dim); }
   .calendar-day.today .day-num { background: var(--accent); color: #fff; }
-  .calendar-day .more { font-size: 0.66rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; }
+  .calendar-day .more { font-size: 0.66rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Työskentelypalkit: sävytetty tausta + kurssin värinen alkureuna */
   .calendar-bar {
     position: relative; z-index: 1;
-    height: 19px; line-height: 19px;
+    height: 28px;
+    display: flex; flex-direction: column; justify-content: center;
     margin: 0 1px;
     padding: 0 7px;
     border-radius: 5px;
@@ -861,7 +862,6 @@
     background: color-mix(in srgb, var(--bar-color, #3b82f6) 26%, var(--card-bg));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, #3b82f6) 65%, transparent);
     border: 1px dashed var(--bar-color, #3b82f6);
-    line-height: 17px;
   }
   .calendar-bar.bar-kind-examwin-closed {
     background: repeating-linear-gradient(135deg,
@@ -870,7 +870,6 @@
     border: 1px dashed color-mix(in srgb, var(--bar-color, #3b82f6) 55%, transparent);
     box-shadow: none;
     color: var(--text-dim);
-    line-height: 17px;
   }
   /* Tehty/ei tehdä -tilat harmaannuttavat ja yliviivaavat palkin tyypistä
      riippumatta — asetettu viimeisenä jotta voittaa kind-tyylit. */
@@ -881,14 +880,25 @@
 
   /* Päivälaatikon pienet sirut (kohteet ilman arvio+tahti -palkkia) */
   .calendar-chip {
-    font-size: 0.66rem; font-weight: 600; line-height: 1.35;
-    padding: 1px 6px;
+    font-size: 0.64rem; font-weight: 600; line-height: 1.3;
+    padding: 2px 6px;
     border-radius: 4px;
     background: color-mix(in srgb, var(--chip-color, #3b82f6) 16%, var(--card-bg));
     color: color-mix(in srgb, var(--chip-color, #3b82f6) 72%, var(--text));
     box-shadow: inset 2px 0 0 var(--chip-color, #3b82f6);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  /* Kurssin nimi pienellä tehtävän yläpuolella (kalenterin palkit ja sirut,
+     viikkonäkymä). Koko kurssinimi näkyy title-vihjeessä. */
+  .item-course {
+    display: block;
+    font-size: 0.54rem; font-weight: 600; line-height: 1.25; letter-spacing: 0.01em;
+    opacity: 0.75;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .item-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+  .week-chip .item-course { font-size: 0.6rem; margin-bottom: 1px; }
+  .week-chip .item-title { white-space: normal; }
   /* Sama tehty/ei tehdä -harmaannutus kuin palkeilla (bar-status-*), mutta
      päivälaatikon pienelle sirulle. */
   .calendar-chip.chip-status-tehty { opacity: 0.45; filter: grayscale(0.8); text-decoration: line-through; }
@@ -1699,6 +1709,33 @@
     const ov = getExamOverride(item);
     return ov ? ov.date : item.date;
   }
+  // Kurssin nimi lyhyenä ilman toteutus- ja ryhmätunnuksia, esim.
+  // "Tietoturvallinen ohjelmistotuotanto IC250109-3002" -> "Tietoturvallinen
+  // ohjelmistotuotanto", "AIC25SP Fysiikan laboraatiot 1 SY221111" ->
+  // "Fysiikan laboraatiot 1".
+  function shortCourseName(item) {
+    const full = String(item.courseName || "");
+    const short = full
+      .replace(/\b[A-Z]{1,4}\d{4,}(?:-\d{3,4})?\b/g, "")
+      .replace(/\b[A-Z]{2,4}\d{2}[A-Z]{2,3}\b/g, "")
+      .replace(/\([A-Z]{2,5}\)/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    return short || full;
+  }
+
+  // Kaksirivinen nimiö: kurssi pienellä, sen alla otsikko.
+  function appendItemLabel(el, item, title) {
+    const course = document.createElement("span");
+    course.className = "item-course";
+    course.textContent = shortCourseName(item);
+    const t = document.createElement("span");
+    t.className = "item-title";
+    t.textContent = title;
+    el.appendChild(course);
+    el.appendChild(t);
+  }
+
   function displayTitle(item) {
     const edit = getUserEdit(item);
     if (edit && edit.title) return edit.title;
@@ -3034,13 +3071,13 @@
 
     let label;
     if (kind === "examwin-open") {
-      label = "EXAM auki: " + item.courseName;
+      label = "EXAM auki";
       el.title =
         item.courseName + ": EXAM-ikkuna varattavissa juuri nyt " +
         fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
         (status === "tehty" ? " (merkitty tehdyksi)" : status === "ei-tehda" ? " (merkitty: ei tehdä)" : status === "kesken" ? " (työn alla)" : "");
     } else if (kind === "examwin-closed") {
-      label = "EXAM ei vielä auki: " + item.courseName;
+      label = "EXAM ei vielä auki";
       el.title =
         item.courseName + ": EXAM-ikkunan osa ei ole vielä varattavissa (" +
         fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
@@ -3053,7 +3090,7 @@
         " — työskentely " + fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
         (status === "tehty" ? " (tehty)" : status === "ei-tehda" ? " (ei tehdä)" : status === "kesken" ? " (työn alla)" : "");
     }
-    el.textContent = (ov.continuesBefore ? "… " : "") + label;
+    appendItemLabel(el, item, (ov.continuesBefore ? "… " : "") + label);
 
     el.onclick = (e) => {
       e.stopPropagation();
@@ -3109,11 +3146,20 @@
       const weekBlock = document.createElement("div");
       weekBlock.className = "calendar-week-block";
       weekBlock.style.gridColumn = "1 / -1";
-      // Rivi 1 = päivälaatikon "otsikko-osa" (numero + tavalliset chipit),
-      // sen jälkeen yksi 15px:n rivi per työskentelyjakson kaista. Päivä-
+      // Rivi 1 = päivälaatikon "otsikko-osa" (numero + enintään 2 kaksirivistä
+      // chippiä), sen jälkeen yksi 28px:n rivi per työskentelyjakson kaista
+      // (palkissa kurssi + otsikko, ks. .calendar-bar). Rivin 1 korkeus
+      // mitoitetaan viikon eniten chippejä sisältävän päivän mukaan, jotta
+      // viikot ilman chippejä pysyvät matalina. Päivä-
       // laatikko ulottuu itse kaikkien näiden rivien yli, jotta palkit
       // näyttävät kuuluvan laatikon SISÄLLE eivätkä kellu sen alapuolella.
-      weekBlock.style.gridTemplateRows = "76px" + (laneCount ? " repeat(" + laneCount + ", 19px)" : "") + " 2px";
+      const maxChips = Math.max(
+        0,
+        ...week.map((c) => (itemsByDateNow[c.iso] || []).filter((it) => !getItemPlanRange(it)).length)
+      );
+      const headHeight = 36 + Math.min(maxChips, 2) * 31 + (maxChips > 2 ? 16 : 0);
+      weekBlock.style.gridTemplateRows =
+        headHeight + "px" + (laneCount ? " repeat(" + laneCount + ", 28px)" : "") + " 2px";
 
       week.forEach((c) => {
         const iso = c.iso;
@@ -3138,19 +3184,20 @@
           .filter((it) => !getItemPlanRange(it))
           .slice()
           .sort((a, b) => a.title.localeCompare(b.title));
-        dayItems.slice(0, 3).forEach((it) => {
+        dayItems.slice(0, 2).forEach((it) => {
           const chip = document.createElement("div");
           const chipStatus = getStatus(it);
           chip.className = "calendar-chip" +
             (chipStatus === "tehty" ? " chip-status-tehty" : chipStatus === "ei-tehda" ? " chip-status-ei-tehda" : chipStatus === "kesken" ? " chip-status-kesken" : "");
           chip.style.setProperty("--chip-color", it.color);
-          chip.textContent = it.title;
+          chip.title = it.courseName + ": " + displayTitle(it);
+          appendItemLabel(chip, it, displayTitle(it));
           cell.appendChild(chip);
         });
-        if (dayItems.length > 3) {
+        if (dayItems.length > 2) {
           const more = document.createElement("div");
           more.className = "more";
-          more.textContent = "+" + (dayItems.length - 3) + " lisää";
+          more.textContent = "+" + (dayItems.length - 2) + " lisää";
           cell.appendChild(more);
         }
 
@@ -3277,7 +3324,7 @@
           const chip = document.createElement("div");
           chip.className = "week-chip";
           chip.style.setProperty("--chip-color", e.item.color);
-          chip.textContent = displayTitle(e.item) + " · " + (Math.round(e.hours * 10) / 10) + "h";
+          appendItemLabel(chip, e.item, displayTitle(e.item) + " · " + (Math.round(e.hours * 10) / 10) + "h");
           chip.title = e.item.courseName;
           col.appendChild(chip);
         });
