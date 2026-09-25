@@ -19,20 +19,18 @@
 // (/app/rest/), joten SAMK voi muuttaa sitä ilman ilmoitusta.
 //
 // Käyttö:
-//   node samk_catalog.js             # täydentää data.json:in ja päivittää data.js:n
-//   node samk_catalog.js --dry-run   # näyttää mitä täytettäisiin, ei kirjoita
+//   node src/integrations/samk_catalog.js             # täydentää data.json:in ja päivittää data.js:n
+//   node src/integrations/samk_catalog.js --dry-run   # näyttää mitä täytettäisiin, ei kirjoita
 //
 // Sama logiikka ajetaan automaattisesti "Hae Moodlesta" -synkan lopuksi
 // (sync_moodle.js), joten uusien kurssien tiedot täyttyvät itsestään.
 
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
 
 const CATALOG_BASE = "https://samk.opinto-opas.fi/app/rest/";
 const REQUEST_TIMEOUT_MS = 30000;
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const BUILD_JS_PATH = path.join(__dirname, "build.js");
+const { DATA_JSON_PATH } = require("../paths.js");
 
 // Opinto-oppaan toteutuskoodi, esim. "IC250105-3002" (opintojakso + toteutus).
 const REALIZATION_CODE_RE = /\b([A-Z]{2,}[0-9A-Z]{3,}-\d{4})\b/;
@@ -267,7 +265,7 @@ async function enrichFromCatalog(data, { log = () => {} } = {}) {
 const FIELD_LABELS = { code: "koodi", credits: "op", start: "alkaa", end: "päättyy", teacher: "opettaja" };
 
 async function main() {
-  require("./load_env.js").loadEnvFile();
+  require("../load_env.js").loadEnvFile();
   const dryRun = process.argv.includes("--dry-run");
   const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
   const changes = await enrichFromCatalog(data, { log: (m) => console.log(m) });
@@ -287,7 +285,8 @@ async function main() {
     return;
   }
   fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
-  execFileSync(process.execPath, [BUILD_JS_PATH], { stdio: "inherit" });
+  require("../build.js").buildDataJs(data);
+  console.log("\ndata.json ja data.js päivitetty.");
 }
 
 module.exports = { enrichFromCatalog, academicYear, normalizeName, codePrefix, findCandidates, narrowCandidates };

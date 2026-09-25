@@ -10,12 +10,17 @@ yksityiskohdat.
 - **Ei riippuvuuksia.** Älä lisää npm-paketteja, build-työkaluja tai
   CDN-kirjastoja. Käytä Node.js:n omia moduuleja ja globaalia `fetch`:iä
   (Node 18+). Selaimessa vanilla-JS:ää.
-- **`index.html` on yksi tiedosto.** CSS ja JS pysyvät sen sisällä. JS on
+- **Kansiot:** `public/` (selaimelle tarjottavat), `src/` (koodi, `src/moodle/`
+  ja `src/integrations/`), `data/` (käyttäjän omat tiedot), `debug/`,
+  `docs/`. Kaikki tiedostopolut ovat `src/paths.js`:ssä: älä rakenna polkuja
+  itse `__dirname`:sta. Palvelin tarjoaa vain `public/`-kansion.
+- **`public/index.html` on yksi tiedosto.** CSS ja JS pysyvät sen sisällä. JS on
   yksi IIFE, näkymät reititetään hashilla (`route()`), ja `refresh()`
   rakentaa näkymän aina uudelleen tilasta.
 - **Käyttöliittymä on suomeksi.** Uudet tekstit suomeksi ja lyhyesti.
-- **`data.json` on kurssidatan ainoa lähde.** `data.js` generoidaan
-  (`npm run build`), sitä ei koskaan muokata käsin. Käyttöliittymä ei
+- **`data/data.json` on kurssidatan ainoa lähde.** `public/data.js`
+  generoidaan (`npm run build` tai koodissa `buildDataJs()` tiedostosta
+  `src/build.js`), sitä ei koskaan muokata käsin. Käyttöliittymä ei
   kirjoita `data.json`:iin; käyttäjän omat merkinnät menevät
   localStorageen.
 - **Kaikki toimii paikallisesti.** Ei ulkoisia palveluita ilman käyttäjän
@@ -24,16 +29,17 @@ yksityiskohdat.
 
 ## Salaisuudet ja henkilötiedot
 
-- Älä koskaan committaa: `.env`, `credentials.json`, `token.json`,
-  `sync_state.json`, `data.json`, `data.js`, `deadline_scan.json`,
-  `debug_*.html`. Ne ovat `.gitignore`:ssa; älä poista niitä sieltä.
+- Älä koskaan committaa: `.env`, `data/`-kansion omia tiedostoja
+  (`data.json`, `credentials.json`, `token.json`, `sync_state.json`,
+  `sync_report.json`, `deadline_scan.json`), `public/data.js` tai `debug/`.
+  Ne ovat `.gitignore`:ssa; älä poista niitä sieltä.
 - Älä kovakoodaa henkilökohtaisia arvoja (käyttäjä-id, tunnukset,
   kurssikohtaiset tiedot). Uudet asetukset lisätään `.env.example`:en,
-  `server.js`:n `SETTINGS_KEYS`-listaan ja `index.html`:n
+  `src/server.js`:n `SETTINGS_KEYS`-listaan ja `public/index.html`:n
   `SETTINGS_GROUPS`:iin.
 - `/api/settings/status` palauttaa vain totuusarvoja. Älä koskaan palauta
   tai lokita salaisuuksien arvoja, vain avainten nimiä.
-- Lue `process.env` kutsuhetkellä, ei moduulin latautuessa: `server.js`
+- Lue `process.env` kutsuhetkellä, ei moduulin latautuessa: `src/server.js`
   lataa skriptit kerran, ja Asetuksista tallennetut arvot päivittyvät
   `process.env`:iin ajon aikana.
 
@@ -61,13 +67,14 @@ yksityiskohdat.
   ja SAMKin kirjautumispalvelun pitää olla tavoitettavissa, joten
   Moodle-skriptejä ei voi ajaa ympäristössä, jolla ei ole pääsyä
   `moodle5.samk.fi`:hin; testaa jäsennys tallennetulla HTML:llä
-  (`debug_fetch_page.js`) tai mockatulla `fetch`:llä.
+  (`src/moodle/debug_fetch_page.js`, tallentaa `debug/`-kansioon) tai
+  mockatulla `fetch`:llä.
 - **Opinto-opas** (`samk_catalog.js`) käyttää dokumentoimatonta
   rajapintaa. Pidä se valinnaisena: virhe kirjataan synkan virheisiin eikä
   kaada mitään, ja vain puuttuvat kentät täytetään.
-- **Synkan yhteenveto:** `sync_moodle.js`:n `summary`-kentät
+- **Synkan yhteenveto:** `src/moodle/sync_moodle.js`:n `summary`-kentät
   (`coursesScanned`, `dueFound`, `alreadyKnown`, `courses` ...) ja
-  `index.html`:n `describeSync()` kuuluvat yhteen. Jos muutat toista,
+  `public/index.html`:n `describeSync()` kuuluvat yhteen. Jos muutat toista,
   päivitä toinen. "0 uutta" ei saa koskaan näyttää onnistumiselta, jos
   mitään ei oikeasti tarkistettu.
 - **Windows:** käyttäjät ovat enimmäkseen Windowsilla. Älä käytä
@@ -79,15 +86,15 @@ yksityiskohdat.
 Ennen committia:
 
 1. Syntaksi: `node --check <tiedosto>.js` jokaiselle muutetulle
-   skriptille. `index.html`:n JS: pura `<script>`-lohko erilliseen
+   skriptille. `public/index.html`:n JS: pura `<script>`-lohko erilliseen
    tiedostoon ja aja `node --check`.
 2. Aja puhtaassa kopiossa `npm run setup` ja sitten
-   `npm start -- --port 8181`, jolloin data tulee `data.example.json`:sta.
+   `npm start -- --port 8181`, jolloin data tulee `data/data.example.json`:sta.
 3. Käy läpi kaikki näkymät (Dashboard, Kalenteri, Viikko, Asetukset,
    kurssisivu) vaaleassa ja tummassa teemassa sekä noin 375 px leveällä
    näytöllä. Selaimen konsolissa ei saa olla virheitä.
 4. Jos muutos koskee tallennusta, testaa myös sivun uudelleenlataus.
-5. Moodle-synkan muutokset: aja synkka ja tarkista `sync_report.json`,
+5. Moodle-synkan muutokset: aja synkka ja tarkista `data/sync_report.json`,
    jossa näkyy jokainen löydetty tehtävä ja mihin se täsmättiin.
 
 ## Dokumentaatio

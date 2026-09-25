@@ -5,7 +5,7 @@
 // (assign, quiz, workshop) sen oman Moodle-sivun ja poimii sielta talteen
 // paasisallon tekstina seka rivit joissa nayttaa lukevan jotain paivamaaraan
 // tai maaraaikaan viittaavaa. Tulos tallennetaan tiedostoon
-// deadline_scan.json, jotta koko kurssien piilossa oleva tehtava/deadline-
+// data/deadline_scan.json, jotta koko kurssien piilossa oleva tehtava/deadline-
 // tieto voidaan kayda lapi kerralla sen sijaan etta jokainen Moodle-sivu
 // pitaisi avata kasin.
 //
@@ -14,18 +14,17 @@
 // kasin/keskustellen kun tulokset on kaytu lapi.
 //
 // Kaytto:
-//   node find_deadlines.js                  # skannaa kaikkien kurssien assign/quiz-kohteet
-//   node find_deadlines.js --course=<id>     # vain yksi kurssi (data.json:in id-kentta)
-//   node find_deadlines.js --delay=500       # viive pyyntojen valissa ms (oletus 300)
+//   node src/moodle/find_deadlines.js                  # skannaa kaikkien kurssien assign/quiz-kohteet
+//   node src/moodle/find_deadlines.js --course=<id>     # vain yksi kurssi (data.json:in id-kentta)
+//   node src/moodle/find_deadlines.js --delay=500       # viive pyyntojen valissa ms (oletus 300)
 
 const fs = require("fs");
 const path = require("path");
-require("./load_env.js").loadEnvFile();
+require("../load_env.js").loadEnvFile();
 const { fetchMoodlePage, htmlToText } = require("./scrape_course_content.js");
 const { ensureFreshSession } = require("./refresh_moodle_session.js");
 
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const OUTPUT_PATH = path.join(__dirname, "deadline_scan.json");
+const { DATA_JSON_PATH, DEADLINE_SCAN_PATH: OUTPUT_PATH } = require("../paths.js");
 const SCANNABLE_TYPES = new Set(["assign", "quiz", "workshop"]);
 
 // Suomeksi ja englanniksi yleisimmat maaraaika-sanat, seka paivamaarien

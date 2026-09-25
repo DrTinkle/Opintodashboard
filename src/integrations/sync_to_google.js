@@ -7,16 +7,17 @@
 // OAuth2-loopback-kirjautumista, ei mitaan npm install -paketteja.
 //
 // KAYTTOONOTTO (tehdaan kerran):
-//   Katso README.md:n osio "Google-kalenterisynkka" -- lyhyesti: luo Google
+//   Katso docs/google-kalenteri.md -- lyhyesti: luo Google
 //   Cloud -projekti, ota Tasks API ja Calendar API kayttoon, luo OAuth-client
-//   (tyyppi "Desktop app"), lataa credentials.json talle kansiolle.
+//   (tyyppi "Desktop app"), ja lisaa sen tiedot Asetuksiin (tai lataa
+//   credentials.json data/-kansioon).
 //
 // KAYTTO:
-//   node sync_to_google.js                    # kirjautuu tarv. selaimen kautta, synkkaa kaiken
-//   node sync_to_google.js --dry-run          # nayttaa mita tehtaisiin, ei muuta mitaan
-//   node sync_to_google.js --course <kurssin-id>       # vain yksi kurssi
-//   node sync_to_google.js --tasklist "Oma lista" --calendar "Oma kalenteri"
-//   node sync_to_google.js --logout           # poistaa tallennetun kirjautumisen (token.json)
+//   node src/integrations/sync_to_google.js                    # kirjautuu tarv. selaimen kautta, synkkaa kaiken
+//   node src/integrations/sync_to_google.js --dry-run          # nayttaa mita tehtaisiin, ei muuta mitaan
+//   node src/integrations/sync_to_google.js --course <kurssin-id>       # vain yksi kurssi
+//   node src/integrations/sync_to_google.js --tasklist "Oma lista" --calendar "Oma kalenteri"
+//   node src/integrations/sync_to_google.js --logout           # poistaa tallennetun kirjautumisen (token.json)
 //
 // Idempotentti: ajaminen uudelleen paivittaa jo luodut rivit sen sijaan
 // etta loisi kopioita (muistetaan sync_state.json:issa). Jos deadline
@@ -28,12 +29,14 @@ const path = require("path");
 const http = require("http");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
-require("./load_env.js").loadEnvFile();
+require("../load_env.js").loadEnvFile();
 
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const CREDENTIALS_PATH = path.join(__dirname, "credentials.json");
-const TOKEN_PATH = path.join(__dirname, "token.json");
-const STATE_PATH = path.join(__dirname, "sync_state.json");
+const {
+  DATA_JSON_PATH,
+  CREDENTIALS_PATH,
+  TOKEN_PATH,
+  SYNC_STATE_PATH: STATE_PATH,
+} = require("../paths.js");
 
 const SCOPES = ["https://www.googleapis.com/auth/tasks", "https://www.googleapis.com/auth/calendar"];
 const DEFAULT_TASKLIST_NAME = "Koulu - Deadlinet";
@@ -371,7 +374,7 @@ function loadGoogleCredentials() {
 // server.js:n /api/sync-google-reitilta), argumentit annetaan tassa
 // sen sijaan etta luetaan process.argv:sta -- server.js:n OMAT
 // komentorivilipuf (esim. --port) eivat silloin voi vahingossa sekoittua
-// synkan asetuksiin. CLI-kaytossa (node sync_to_google.js ...) overrideOpts
+// synkan asetuksiin. CLI-kaytossa (node src/integrations/sync_to_google.js ...) overrideOpts
 // on undefined ja process.argv luetaan normaalisti.
 async function main(overrideOpts) {
   const opts = overrideOpts ? Object.assign(parseArgs([]), overrideOpts) : parseArgs(process.argv.slice(2));
@@ -391,7 +394,7 @@ async function main(overrideOpts) {
     throw new Error(
       'Google-kirjautumistietoja ei loydy. Lisaa .env-tiedostoon GOOGLE_CLIENT_ID ja ' +
         "GOOGLE_CLIENT_SECRET (ks. .env.example), tai lataa credentials.json Google Cloud " +
-        'Consolesta. Katso README.md:n osio "Google-kalenterisynkka".'
+        "Consolesta data/-kansioon. Katso docs/google-kalenteri.md."
     );
   }
 

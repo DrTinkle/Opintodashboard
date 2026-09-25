@@ -23,11 +23,11 @@ npm-asennuksia.
 - **DeepSeek-tuntiarviot** (valinnainen): automaattinen aika-arvio uusille
   tehtäville.
 
-![Dashboard](images/Dashboard.jpg)
+![Dashboard](docs/images/Dashboard.jpg)
 
 | Kalenteri | Viikkosuunnitelma |
 | --- | --- |
-| ![Kalenteri](images/Kalenteri.jpg) | ![Viikko](images/Viikko.jpg) |
+| ![Kalenteri](docs/images/Kalenteri.jpg) | ![Viikko](docs/images/Viikko.jpg) |
 
 ## Vaatimukset
 
@@ -50,7 +50,7 @@ npm-asennuksia.
    - **macOS / Linux:** `sh setup.sh`
    - **Tai mikä tahansa kone:** `npm run setup`
 
-   Asennus tarkistaa Node.js:n, luo omat `data.json`- ja `.env`-tiedostosi
+   Asennus tarkistaa Node.js:n, luo omat `data/data.json`- ja `.env`-tiedostosi
    esimerkeistä ja valmistelee kurssidatan. Sen voi ajaa uudelleen
    turvallisesti: jo olemassa oleviin omiin tiedostoihin se ei koske.
 3. **Käynnistä:**
@@ -82,7 +82,7 @@ npm-asennuksia.
 4. **Jos kurssilla näkyy "Täydennä tiedot"**, sitä ei löytynyt
    opinto-oppaasta (esim. Library Moodle, joka ei ole oikea kurssi).
    Piilota se kurssikortin Poista-napilla, tai lisää tiedot käsin
-   `data.json`:iin (`credits`, `teacher`, `start`, `end`) ja aja
+   `data/data.json`:iin (`credits`, `teacher`, `start`, `end`) ja aja
    `npm run build`.
 
 ## Käyttö lyhyesti
@@ -128,12 +128,26 @@ npm-asennuksia.
 - Opinto-oppaan haut ovat julkisia eivätkä vaadi kirjautumista. Niissä
   lähetetään vain koulutusohjelman tunnus, ei henkilötietoja.
 
+## Kansiot
+
+| Kansio | Sisältö |
+| --- | --- |
+| `public/` | Dashboardin käyttöliittymä (`index.html`) ja siitä generoitu kurssidata (`data.js`) |
+| `data/` | Omat tietosi: kurssit (`data.json`), Google-kirjautuminen ja synkkojen tila. Ei gitissä, paitsi `data.example.json`. |
+| `src/` | Koodi: palvelin, Moodle-skriptit (`src/moodle/`) ja integraatiot (`src/integrations/`) |
+| `docs/` | Tekninen dokumentaatio ja kuvakaappaukset |
+| `.env` | Asetukset ja kirjautumistiedot (projektin juuressa, ei gitissä) |
+
+Jos päivität vanhemmasta versiosta, jossa kaikki tiedostot olivat samassa
+kansiossa, `npm start` ja `npm run setup` siirtävät omat tiedostosi
+automaattisesti oikeisiin kansioihin.
+
 ## Ongelmatilanteita
 
 - **"Portti 8080 on jo käytössä":** käynnistä toiseen porttiin:
-  `node server.js --port 3000`.
+  `npm start -- --port 3000`.
 - **Asetukset tai Hae Moodlesta eivät toimi:** avaa dashboard
-  `npm start` -komennolla, ei suoraan `index.html`-tiedostona.
+  `npm start` -komennolla, ei suoraan `public/index.html`-tiedostona.
 - **Hae Moodlesta antaa kirjautumisvirheen:** tarkista tunnukset
   Asetuksista. Jos käytät pelkkää evästettä, se on voinut vanhentua:
   hae uusi.
@@ -142,7 +156,7 @@ npm-asennuksia.
 - **"0 uutta" epäilyttää:** tila kertoo, montako kurssia ja määräaikaa
   tarkistettiin. Jos mitään ei voitu tarkistaa, se näkyy punaisena
   virheenä. Täysi raportti jokaisesta löydetystä tehtävästä on tiedostossa
-  `sync_report.json`.
+  `data/sync_report.json`.
 - **Kurssin tiedot puuttuvat:** tarkista, että ryhmätunnus on asetettu.
   Opinto-oppaassa ei ole kaikkia opintoja (esim. Library Moodle).
 

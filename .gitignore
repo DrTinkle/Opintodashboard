@@ -4,35 +4,36 @@
 # omat kirjautumiset, tokenit ja oma kurssidata jäävät vain omalle koneelle.
 # ===========================================================================
 
-# --- Salaisuudet ja kirjautumistiedot (EI IKINÄ repoon) ---------------------
+# --- Asetukset ja kirjautumistiedot (EI IKINÄ repoon) -----------------------
 # Asetukset-välilehti tallentaa nämä .env-tiedostoon.
 .env
 .env.*
 !.env.example
-# Google OAuth: Cloud Consolesta ladattu client-tiedosto ja kirjautumistoken
-credentials.json
+
+# --- Omat tiedot: data/-kansiossa vain esimerkki on gitissä ------------------
+# data.json (kurssit), credentials.json ja token.json (Google-kirjautuminen),
+# sync_state.json, sync_report.json, deadline_scan.json ...
+data/*
+!data/data.example.json
+
+# Generoitu data/data.json:sta (npm run build)
+public/data.js
+
+# Vianetsinnän HTML-tallenteet: sisältävät nimen, kurssit ja istuntotietoja
+debug/
+
+# --- Varmuuden vuoksi myös vanhan rakenteen tiedostot juuressa ---------------
+# (npm start / npm run setup siirtää nämä data/-kansioon)
+/data.json
+/data.js
 credentials*.json
 client_secret*.json
-token.json
 token*.json
-# Google-synkan tila (sisältää omien kalenteritapahtumien tunnisteet)
 sync_state.json
-
-# --- Oma kurssidata (jokaisella omansa) -------------------------------------
-# Luo oma kopioimalla data.example.json -> data.json (npm run setup tekee
-# tämän automaattisesti). data.js generoidaan aina data.json:sta.
-data.json
-data.js
-data.json.bak
-*.bak
-# Moodle-skannausten välimuistit (omat tehtävänannot ja kuvaukset)
-deadline_scan.json
 sync_report.json
-
-# --- Debug-dumpit ------------------------------------------------------------
-# Tallennettuja Moodle-sivuja: sisältävät nimen, kurssit ja istuntotietoja.
+deadline_scan.json
 debug_*.html
-debug_*.json
+*.bak
 
 # --- Node.js -----------------------------------------------------------------
 # Projektilla ei ole npm-riippuvuuksia, mutta varmuuden vuoksi:

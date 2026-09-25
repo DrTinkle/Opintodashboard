@@ -6,16 +6,16 @@
 // voittaa aina .env-tiedoston).
 //
 // Kayttö skripteissa:
-//   require("./load_env.js").loadEnvFile();
+//   require('../load_env.js').loadEnvFile();   (src/moodle- tai src/integrations-kansiosta)
 //
 // .env-tiedosto ei ole pakollinen -- jos sita ei loydy, tama ei tee mitaan
 // eika kaadu.
 
 const fs = require("fs");
-const path = require("path");
+const { ENV_PATH } = require("./paths.js");
 
 function loadEnvFile(envPath) {
-  const target = envPath || path.join(__dirname, ".env");
+  const target = envPath || ENV_PATH;
   let content;
   try {
     content = fs.readFileSync(target, "utf8");

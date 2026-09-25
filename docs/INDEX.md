@@ -23,9 +23,9 @@ ovat [README.md](../README.md):ssä ja koodin muokkaamisen säännöt
 ## Arkkitehtuuri
 
 ```
-Moodle ──(skriptit / Hae Moodlesta)──▶ data.json ──(build.js)──▶ data.js
-                                                                    │
-                   selain: index.html  ◀──── server.js (localhost) ─┘
+Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)──▶ public/data.js
+                                                                        │
+               selain: public/index.html  ◀──── src/server.js (localhost) ─┘
                           │
                           └── localStorage (tilat, arviot, omat tehtävät ...)
 ```
@@ -33,44 +33,74 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data.json ──(build.js)─�
 - **Ei riippuvuuksia.** Kaikki on tehty Node.js:n omilla moduuleilla
   (`http`, `fs`, `path`, `child_process`) ja globaalilla `fetch`:llä
   (siksi Node 18+). Ei npm-paketteja, ei build-työkaluja.
-- **`data.json` on kurssidatan ainoa totuus.** `build.js` kirjoittaa sen
-  sisällön tiedostoon `data.js` muodossa `const COURSES = [...]`, jonka
-  `index.html` lataa `<script src>`-tagilla.
-- **`index.html` on koko käyttöliittymä:** yksi tiedosto, jossa CSS ja
-  vanilla-JS (yksi IIFE). Hash-reititys: `#` (dashboard), `#kalenteri`,
+- **`data/data.json` on kurssidatan ainoa totuus.** `buildDataJs()`
+  (`src/build.js`) kirjoittaa sen sisällön tiedostoon `public/data.js`
+  muodossa `const COURSES = [...]`, jonka `index.html` lataa
+  `<script src>`-tagilla.
+- **`public/index.html` on koko käyttöliittymä:** yksi tiedosto, jossa CSS
+  ja vanilla-JS (yksi IIFE). Hash-reititys: `#` (dashboard), `#kalenteri`,
   `#viikko`, `#asetukset`, `#kurssi/<id>`.
 - **Käyttäjän omat merkinnät** (tilat, arviot, omat tehtävät, muokkaukset,
   piilotukset) ovat vain selaimen localStoragessa. `data.json`:ia ei
   koskaan muokata käyttöliittymästä, joten Moodle-synkka ei riko niitä.
-- **`server.js`** tarjoaa staattiset tiedostot ja muutaman POST/GET-reitin,
-  jotka ajavat skriptejä käyttäjän omalla koneella (jolla on pääsy
-  Moodleen ja Googleen).
+- **`src/server.js`** tarjoaa `public/`-kansion staattisina tiedostoina ja
+  muutaman POST/GET-reitin, jotka ajavat skriptejä käyttäjän omalla
+  koneella (jolla on pääsy Moodleen ja Googleen). Muut kansiot (`data/`,
+  `.env`, `src/`) eivät ole haettavissa selaimesta.
+- **Kaikki tiedostopolut ovat `src/paths.js`:ssä.** Skriptit eivät rakenna
+  polkuja itse. Samassa tiedostossa on `migrateLegacyFiles()`, joka siirtää
+  vanhan (kaikki juuressa) rakenteen omat tiedostot uusiin kansioihin;
+  sitä kutsutaan `npm start`:n ja `npm run setup`:n yhteydessä.
 
 ## Tiedostot
 
+```
+.
+├── README.md, AGENTS.md, package.json, .env.example
+├── setup.bat, setup.sh          käyttöönotto (Windows / macOS, Linux)
+├── .env                         omat asetukset (ei gitissä)
+├── public/
+│   ├── index.html               käyttöliittymä
+│   └── data.js                  generoitu data.json:sta (ei gitissä)
+├── data/
+│   ├── data.example.json        esimerkkidata (gitissä)
+│   └── ...                      omat tiedot (ei gitissä, ks. alla)
+├── debug/                       vianetsinnän HTML-tallenteet (ei gitissä)
+├── docs/
+│   ├── INDEX.md, google-kalenteri.md
+│   └── images/                  README:n kuvakaappaukset
+└── src/
+    ├── paths.js, load_env.js, build.js, setup.js, server.js
+    ├── moodle/
+    └── integrations/
+```
+
 | Tiedosto | Tehtävä |
 | --- | --- |
-| `index.html` | Koko käyttöliittymä (HTML, CSS ja JS samassa tiedostossa) |
-| `server.js` | Staattinen HTTP-palvelin + API-reitit, oletusportti 8080 |
-| `build.js` | Generoi `data.js`:n `data.json`:sta |
-| `setup.js`, `setup.bat`, `setup.sh` | Käyttöönotto: Node-tarkistus, omat tiedostot esimerkeistä, build |
-| `load_env.js` | Pieni `.env`-lukija, jota kaikki skriptit käyttävät |
-| `sync_moodle.js` | "Hae Moodlesta": uudet kurssit, sisältö ja deadlinet |
-| `update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |
-| `scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`) |
-| `find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
-| `find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `deadline_scan.json` tarkistettavaksi |
-| `samk_catalog.js` | Täydentää kurssien puuttuvat tiedot SAMKin julkisesta opinto-oppaasta |
-| `refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
-| `estimate_deepseek.js` | Tuntiarvio uusille tehtäville DeepSeekin API:lla |
-| `sync_to_google.js` | Vienti Google Tasksiin ja Google-kalenteriin |
-| `debug_fetch_page.js` | Vianetsintä: tallentaa yhden Moodle-sivun raakana HTML:nä |
-| `data.example.json` | Esimerkkidata, josta `setup.js` luo `data.json`:in |
-| `.env.example` | Asetuspohja, josta `setup.js` luo `.env`:n |
+| `public/index.html` | Koko käyttöliittymä (HTML, CSS ja JS samassa tiedostossa) |
+| `src/server.js` | HTTP-palvelin (`public/`) + API-reitit, oletusportti 8080 |
+| `src/paths.js` | Kaikki tiedostopolut ja vanhan rakenteen siirto |
+| `src/build.js` | `buildDataJs()`: generoi `public/data.js`:n `data/data.json`:sta |
+| `src/setup.js`, `setup.bat`, `setup.sh` | Käyttöönotto: Node-tarkistus, omat tiedostot esimerkeistä, build |
+| `src/load_env.js` | Pieni `.env`-lukija, jota kaikki skriptit käyttävät |
+| `src/moodle/sync_moodle.js` | "Hae Moodlesta": uudet kurssit, sisältö ja deadlinet |
+| `src/moodle/update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |
+| `src/moodle/scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`), Moodle-sivujen haku |
+| `src/moodle/find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
+| `src/moodle/find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `data/deadline_scan.json` tarkistettavaksi |
+| `src/moodle/refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
+| `src/moodle/debug_fetch_page.js` | Vianetsintä: tallentaa yhden Moodle-sivun `debug/`-kansioon |
+| `src/integrations/samk_catalog.js` | Täydentää kurssien puuttuvat tiedot SAMKin julkisesta opinto-oppaasta |
+| `src/integrations/estimate_deepseek.js` | Tuntiarvio uusille tehtäville DeepSeekin API:lla |
+| `src/integrations/sync_to_google.js` | Vienti Google Tasksiin ja Google-kalenteriin |
+| `data/data.example.json` | Esimerkkidata, josta setup luo `data/data.json`:in |
+| `.env.example` | Asetuspohja, josta setup luo `.env`:n |
 
-Generoidut ja henkilökohtaiset tiedostot (`data.json`, `data.js`, `.env`,
-`token.json`, `sync_state.json`, `sync_report.json`, `credentials.json`,
-`deadline_scan.json`, `debug_*.html`) ovat `.gitignore`:ssa.
+Omat tiedostot `data/`-kansiossa (kaikki `.gitignore`:ssa): `data.json`
+(kurssit), `credentials.json` ja `token.json` (Google), `sync_state.json`
+(Google-synkan tila), `sync_report.json` (viimeisin Moodle-synkka),
+`deadline_scan.json` (`find_deadlines.js`:n tulos). Lisäksi
+`.env`, `public/data.js` ja `debug/` ovat `.gitignore`:ssa.
 
 ## Tietomalli: data.json
 
@@ -108,7 +138,7 @@ Generoidut ja henkilökohtaiset tiedostot (`data.json`, `data.js`, `.env`,
 
 Deadlinella ei ole omaa id:tä. Kaikki selaimen tallennus avataan
 yhdistelmällä `kurssin id | päivä | otsikko` (ks. `itemKey()`
-`index.html`:ssä). Omilla tehtävillä on oma `id`-kenttä, jota `itemKey()`
+`public/index.html`:ssä). Omilla tehtävillä on oma `id`-kenttä, jota `itemKey()`
 käyttää ensin.
 
 Tyyppi `"examsys"` (EXAM) ei esiinny `data.json`:issa: `rebuildAllItems()`
@@ -145,8 +175,8 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `GET /api/settings/status` | Kertoo vain, onko kukin asetus asetettu (`true`/`false`). Arvoja ei koskaan palauteta. |
 | `POST /api/settings` | `{ set: {KEY: arvo}, clear: [KEY] }`. Kirjoittaa vain muuttuneet rivit `.env`:iin ja päivittää käynnissä olevan palvelimen `process.env`:n. |
 
-Kaikki muut polut tarjotaan staattisina tiedostoina (polun ohitus estetty
-`safeJoin()`:lla). Välimuisti on pois päältä, jotta `data.js`:n muutos
+Kaikki muut polut tarjotaan staattisina tiedostoina `public/`-kansiosta
+(polun ohitus estetty `safeJoin()`:lla). Välimuisti on pois päältä, jotta `public/data.js`:n muutos
 näkyy heti uudelleenlatauksella.
 
 ## Asetukset ja .env
@@ -169,18 +199,18 @@ Kaikki Moodle-skriptit lukevat kirjautumisen `.env`:stä ja uusivat
 evästeen tarvittaessa automaattisesti.
 
 ```
-npm start                                  # node server.js [--port 3000]
-npm run build                              # data.json -> data.js
-npm run sync:moodle                        # node sync_moodle.js [--delay 500] [--userid N]
+npm start                                  # node src/server.js [--port 3000]
+npm run build                              # data/data.json -> public/data.js
+npm run sync:moodle                        # node src/moodle/sync_moodle.js [--delay 500] [--userid N]
 npm run sync:google                        # ks. docs/google-kalenteri.md
-npm run find-ids                           # node find_moodle_ids.js [--dry-run] [--userid N]
-npm run catalog                            # node samk_catalog.js [--dry-run]
+npm run find-ids                           # node src/moodle/find_moodle_ids.js [--dry-run] [--userid N]
+npm run catalog                            # node src/integrations/samk_catalog.js [--dry-run]
 
-node update_from_moodle.js --url "<ICS-vientilinkki>" [--dry-run] [--debug]
-node update_from_moodle.js --file kalenteri.ics
-node scrape_course_content.js [--course <moodleId>] [--dry-run] [--debug] [--delay ms]
-node find_deadlines.js [--course=<id>] [--delay=ms]
-node refresh_moodle_session.js [--dry-run] [--debug]
+node src/moodle/update_from_moodle.js --url "<ICS-vientilinkki>" [--dry-run] [--debug]
+node src/moodle/update_from_moodle.js --file kalenteri.ics
+node src/moodle/scrape_course_content.js [--course <moodleId>] [--dry-run] [--debug] [--delay ms]
+node src/moodle/find_deadlines.js [--course=<id>] [--delay=ms]
+node src/moodle/refresh_moodle_session.js [--dry-run] [--debug]
 ```
 
 `find_moodle_ids.js` ja `scrape_course_content.js` hyväksyvät myös
@@ -248,7 +278,7 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   tarkistettiin ja montako määräaikaa Moodlesta löytyi (joista jo listalla /
   uusia). Kurssikohtainen erittely näkyy tilatekstin päällä hiirellä, ja
   koko raportti (jokainen löydetty tehtävä ja mihin se täsmättiin)
-  tallentuu tiedostoon `sync_report.json`. Jos yhtään kurssia ei voitu
+  tallentuu tiedostoon `data/sync_report.json`. Jos yhtään kurssia ei voitu
   tarkistaa, tila näytetään virheenä eikä "ei uutta" -tuloksena.
 - **Roskakurssit:** esim. "Library Moodle" näkyy profiilin kurssilistassa;
   piilota se kurssikortista.
@@ -285,11 +315,11 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   tapahtumina.
 - Jokainen deadline saa muistutustapahtuman edellisenä päivänä
   (`REMINDER_TIME_START`), EXAM-ikkunat varauksen avautumispäivänä.
-- OAuth2-kirjautuminen omalla loopback-toteutuksella, `token.json`
+- OAuth2-kirjautuminen omalla loopback-toteutuksella, `data/token.json`
   uusiutuu automaattisesti. Windowsilla selain avataan
   `rundll32 url.dll,FileProtocolHandler`:llä, koska `cmd /c start`
   katkaisee URL:n `&`-merkkiin.
-- Idempotentti: `sync_state.json` muistaa, mikä deadline vastaa mitäkin
+- Idempotentti: `data/sync_state.json` muistaa, mikä deadline vastaa mitäkin
   Google-merkintää.
 
 ## DeepSeek-arviot
@@ -307,6 +337,6 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - Tehtävän nimi linkittää kurssin Moodle-etusivulle, ei suoraan
   tehtävään (aktiviteetin id:tä ei tallenneta).
 - Moodlen sivurakenteen muutos voi rikkoa jäsennyksen; käytä
-  `debug_fetch_page.js`:ää vianetsintään.
+  `src/moodle/debug_fetch_page.js`:ää vianetsintään.
 - Kaikki Moodle-osoitteet olettavat SAMKin Moodlen (`moodle5.samk.fi`).
 - Opinto-oppaan rajapinta on dokumentoimaton ja voi muuttua ilman ilmoitusta.

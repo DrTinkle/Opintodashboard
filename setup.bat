@@ -30,11 +30,11 @@ pause
 exit /b 1
 
 :run
-node setup.js
+node src/setup.js
 if errorlevel 1 (
   pause
   exit /b 1
 )
 choice /C KE /M "Avataanko dashboard nyt"
 if errorlevel 2 exit /b 0
-node server.js
+node src/server.js

@@ -20,9 +20,9 @@
 // jalkikateen muokata/poistaa dashboardin omalla muokkaustyokalulla.
 //
 // Kaytto:
-//   node sync_moodle.js
-//   node sync_moodle.js --delay 800       (viive pyyntojen valissa ms, oletus 500)
-//   node sync_moodle.js --userid 12345    (oma Moodle-userid; oletus .env:n MOODLE_USERID)
+//   node src/moodle/sync_moodle.js
+//   node src/moodle/sync_moodle.js --delay 800       (viive pyyntojen valissa ms, oletus 500)
+//   node src/moodle/sync_moodle.js --userid 12345    (oma Moodle-userid; oletus .env:n MOODLE_USERID)
 //
 // Tata kutsutaan myos server.js:n "/api/sync-moodle"-reitilta (dashboardin
 // "Hae uudet Moodlesta" -nappi), jolloin runSync()-funktiota kutsutaan
@@ -30,8 +30,9 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
-require("./load_env.js").loadEnvFile();
+require("../load_env.js").loadEnvFile();
+const { DATA_JSON_PATH, SYNC_REPORT_PATH: REPORT_PATH } = require("../paths.js");
+const { buildDataJs } = require("../build.js");
 
 const {
   fetchMoodlePage,
@@ -45,13 +46,10 @@ const {
   extractIntroDescription,
   SCANNABLE_TYPES,
 } = require("./find_deadlines.js");
-const { estimateWithDeepSeek } = require("./estimate_deepseek.js");
+const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js");
 
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const BUILD_JS_PATH = path.join(__dirname, "build.js");
-// Viimeisimmän synkan yksityiskohtainen raportti (mitä Moodlesta löytyi ja
-// mihin se täsmättiin). Ei jaeta: sisältää omien tehtävien nimet.
-const REPORT_PATH = path.join(__dirname, "sync_report.json");
+// REPORT_PATH (data/sync_report.json): viimeisimmän synkan yksityiskohtainen
+// raportti (mitä Moodlesta löytyi ja mihin se täsmättiin). Ei jaeta.
 // Oma Moodle-käyttäjä-id luetaan .env:n MOODLE_USERID-kentästä (Asetukset-
 // välilehti) kutsuhetkellä, jotta Asetuksissa tehty muutos on heti voimassa.
 // Ei oletusarvoa, koska id on jokaisella eri.
@@ -386,7 +384,7 @@ async function runSync(opts = {}) {
   // opinto-oppaasta. Valinnainen: virhe ei kaada synkkaa.
   summary.catalogFilled = [];
   try {
-    const { enrichFromCatalog } = require("./samk_catalog.js");
+    const { enrichFromCatalog } = require("../integrations/samk_catalog.js");
     summary.catalogFilled = await enrichFromCatalog(data, {
       log: (m) => summary.errors.push(m),
     });
@@ -408,7 +406,7 @@ async function runSync(opts = {}) {
     summary.newCourses.length > 0 || summary.newTasks.length > 0 || summary.catalogFilled.length > 0;
   if (summary.changed) {
     fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
-    execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
+    buildDataJs(data);
   }
 
   try {
@@ -456,7 +454,7 @@ if (require.main === module) {
             (c.error ? ` (VIRHE: ${c.error})` : "")
         )
       );
-      console.log("Yksityiskohdat: sync_report.json");
+      console.log("Yksityiskohdat: data/sync_report.json");
       if (summary.errors.length) {
         console.log(`\nVirheitä (${summary.errors.length}):`);
         summary.errors.forEach((e) => console.log("  ! " + e));

@@ -1235,7 +1235,7 @@
     </div>
     <div id="settingsOffline" class="callout callout-warn" hidden>
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
-      <div>Asetuksia ei voi lukea eikä tallentaa juuri nyt. Tämä sivu toimii vain, kun dashboard on käynnistetty komennolla <code>node server.js</code> ja avattu osoitteesta http://localhost, ei suoraan tiedostona.</div>
+      <div>Asetuksia ei voi lukea eikä tallentaa juuri nyt. Tämä sivu toimii vain, kun dashboard on käynnistetty komennolla <code>npm start</code> ja avattu osoitteesta http://localhost, ei suoraan tiedostona.</div>
     </div>
     <div id="settingsGroups"></div>
     <div class="settings-actions">
@@ -1323,7 +1323,7 @@
 
   <footer>
     <span>Opintodashboard</span>
-    <span>Kurssidata tulee data.json-tiedostosta. Tilat, arviot ja EXAM-tiedot tallentuvat tämän selaimen muistiin eivätkä synkronoidu laitteiden välillä.</span>
+    <span>Kurssidata tulee data/data.json-tiedostosta. Tilat, arviot ja EXAM-tiedot tallentuvat tämän selaimen muistiin eivätkä synkronoidu laitteiden välillä.</span>
   </footer>
 </div>
 
@@ -2719,7 +2719,7 @@
     if (course.needsInfo) {
       const needsInfoBadge = document.createElement("div");
       needsInfoBadge.className = "needs-info-badge";
-      needsInfoBadge.textContent = "⚠ Tiedot puutteelliset - täydennä op/opettaja/alkamis-päättymispäivät data.json:iin";
+      needsInfoBadge.textContent = "⚠ Tiedot puutteelliset - täydennä op/opettaja/alkamis-päättymispäivät data/data.json:iin";
       header.appendChild(needsInfoBadge);
     }
 

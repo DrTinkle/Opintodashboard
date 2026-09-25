@@ -10,10 +10,10 @@
 // MoodleSession-evästettä tunnistautumiseen.
 //
 // Käyttö:
-//   node scrape_course_content.js --session "<MoodleSession-arvo>"
-//   node scrape_course_content.js --session "..." --course 1497
-//   node scrape_course_content.js --session "..." --dry-run
-//   node scrape_course_content.js --session "..." --debug
+//   node src/moodle/scrape_course_content.js --session "<MoodleSession-arvo>"
+//   node src/moodle/scrape_course_content.js --session "..." --course 1497
+//   node src/moodle/scrape_course_content.js --session "..." --dry-run
+//   node src/moodle/scrape_course_content.js --session "..." --debug
 //
 // MoodleSession-evästeen hakeminen:
 //   1. Kirjaudu Moodleen selaimessa (moodle5.samk.fi)
@@ -29,11 +29,9 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
-require("./load_env.js").loadEnvFile();
-
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const BUILD_JS_PATH = path.join(__dirname, "build.js");
+require("../load_env.js").loadEnvFile();
+const { DATA_JSON_PATH, debugFile } = require("../paths.js");
+const { buildDataJs } = require("../build.js");
 const BASE_URL = "https://moodle5.samk.fi";
 
 // Moodlen mod-tyyppien lyhyet suomenkieliset tunnisteet dashboardia varten.
@@ -416,7 +414,7 @@ async function main() {
     console.log(
       opts.course != null
         ? `Kurssia jonka moodleId on ${opts.course} ei löytynyt data.json:ista.`
-        : "Yhdelläkään kurssilla ei ole moodleId-kenttää data.json:issa - lisää se ensin (katso README.md)."
+        : "Yhdelläkään kurssilla ei ole moodleId-kenttää data/data.json:issa - aja ensin npm run find-ids tai dashboardin Hae Moodlesta."
     );
     return;
   }
@@ -436,7 +434,7 @@ async function main() {
     }
 
     if (opts.debug) {
-      const debugPath = path.join(__dirname, `debug_course_${course.moodleId}.html`);
+      const debugPath = debugFile(`debug_course_${course.moodleId}.html`);
       fs.writeFileSync(debugPath, html);
       console.log(`\n  (debug: koko sivu tallennettu -> ${path.basename(debugPath)})`);
       process.stdout.write("  jäsennetään ... ");
@@ -447,7 +445,7 @@ async function main() {
     console.log(`${topics.length} aihealuetta, ${itemCount} materiaalia/linkkiä.`);
 
     if (itemCount === 0 && !opts.debug) {
-      const debugPath = path.join(__dirname, `debug_course_${course.moodleId}.html`);
+      const debugPath = debugFile(`debug_course_${course.moodleId}.html`);
       fs.writeFileSync(debugPath, html);
       console.log(
         `  Ei löytynyt yhtään materiaalia - tallensin koko sivun tiedostoon ${path.basename(debugPath)} tarkistusta varten.`
@@ -469,7 +467,7 @@ async function main() {
 
   if (anyChanged) {
     fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n");
-    execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
+    buildDataJs(data);
     console.log("data.json ja data.js päivitetty.");
   }
 }

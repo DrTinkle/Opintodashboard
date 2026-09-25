@@ -8,12 +8,12 @@
   },
   "dependencies": {},
   "scripts": {
-    "setup": "node setup.js",
-    "start": "node server.js",
-    "build": "node build.js",
-    "sync:moodle": "node sync_moodle.js",
-    "sync:google": "node sync_to_google.js",
-    "find-ids": "node find_moodle_ids.js",
-    "catalog": "node samk_catalog.js"
+    "setup": "node src/setup.js",
+    "start": "node src/server.js",
+    "build": "node src/build.js",
+    "sync:moodle": "node src/moodle/sync_moodle.js",
+    "sync:google": "node src/integrations/sync_to_google.js",
+    "find-ids": "node src/moodle/find_moodle_ids.js",
+    "catalog": "node src/integrations/samk_catalog.js"
   }
 }

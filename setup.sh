@@ -20,11 +20,11 @@ if ! command -v node >/dev/null 2>&1; then
   fi
 fi
 
-node setup.js
+node src/setup.js
 
 printf "Käynnistetäänkö dashboard nyt? [k/E] "
 read -r ans
 case "$ans" in
-  k|K|y|Y) exec node server.js ;;
+  k|K|y|Y) exec node src/server.js ;;
   *) echo "Käynnistä myöhemmin komennolla: npm start" ;;
 esac

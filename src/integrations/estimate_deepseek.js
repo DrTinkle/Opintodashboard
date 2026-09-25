@@ -6,7 +6,7 @@
 // index.html: computeStartByDate/getPlanHoursPace). Kutsutaan VAIN aidosti
 // uusille tehtaville sync_moodle.js:sta ja update_from_moodle.js:sta - ei
 // joka skannauksella jo tunnetuille tehtaville, jotta API-kutsuja ei
-// tuhlata (ks. README.md:n osio "DeepSeek-aika-arviot").
+// tuhlata (ks. docs/INDEX.md, osio "DeepSeek-arviot").
 //
 // Vaatii .env-tiedostoon DEEPSEEK_API_KEY:n (ks. .env.example). Jos avainta
 // ei ole, tai kutsu epaonnistuu MILLA TAHANSA tavalla (verkko, aikakatkaisu,

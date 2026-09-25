@@ -36,7 +36,7 @@ ilmainen.
    Google-kalenterisynkan kenttiin ja tallenna.
 
 Vaihtoehtoisesti voit ladata client-tiedoston JSON-muodossa ja tallentaa
-sen dashboard-kansioon nimellä `credentials.json`.
+sen dashboardin `data/`-kansioon nimellä `credentials.json`.
 
 ## Ensimmäinen vienti
 
@@ -49,7 +49,7 @@ kirjautumiseen:
    Go to <sovelluksesi nimi> (unsafe)**.
 3. Hyväksy oikeudet Tasksiin ja kalenteriin.
 
-Kirjautuminen muistetaan tiedostossa `token.json`, joten seuraavilla
+Kirjautuminen muistetaan tiedostossa `data/token.json`, joten seuraavilla
 kerroilla selainta ei tarvitse avata.
 
 ## Komentorivi
@@ -57,17 +57,17 @@ kerroilla selainta ei tarvitse avata.
 Nappi käyttää oletusasetuksia. Komentoriviltä voit rajata vientiä:
 
 ```
-node sync_to_google.js --dry-run                   # näytä mitä tehtäisiin, älä muuta mitään
-node sync_to_google.js --course <kurssin-id>       # vain yksi kurssi (data.json:in id)
-node sync_to_google.js --tasklist "Oma lista" --calendar "Oma kalenteri"
-node sync_to_google.js --logout                    # unohda kirjautuminen (poistaa token.json:in)
+node src/integrations/sync_to_google.js --dry-run                   # näytä mitä tehtäisiin, älä muuta mitään
+node src/integrations/sync_to_google.js --course <kurssin-id>       # vain yksi kurssi (data.json:in id)
+node src/integrations/sync_to_google.js --tasklist "Oma lista" --calendar "Oma kalenteri"
+node src/integrations/sync_to_google.js --logout                    # unohda kirjautuminen (poistaa token.json:in)
 ```
 
 ## Tiedostot, joita ei koskaan jaeta
 
 `.gitignore` pitää nämä poissa gitistä:
 
-- `credentials.json`: oma OAuth-asiakkaasi
-- `token.json`: kirjautumisesi Googleen
-- `sync_state.json`: tieto siitä, mikä deadline vastaa mitäkin
+- `data/credentials.json`: oma OAuth-asiakkaasi
+- `data/token.json`: kirjautumisesi Googleen
+- `data/sync_state.json`: tieto siitä, mikä deadline vastaa mitäkin
   Google-merkintää

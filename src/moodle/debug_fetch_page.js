@@ -7,18 +7,19 @@
 // find_deadlines.js:n sisallonpoiminta on saatu korjattua.
 //
 // Kaytto:
-//   node debug_fetch_page.js "https://moodle5.samk.fi/mod/assign/view.php?id=75278"
+//   node src/moodle/debug_fetch_page.js "https://moodle5.samk.fi/mod/assign/view.php?id=75278"
 
 const fs = require("fs");
 const path = require("path");
-require("./load_env.js").loadEnvFile();
+require("../load_env.js").loadEnvFile();
+const { debugFile } = require("../paths.js");
 const { fetchMoodlePage } = require("./scrape_course_content.js");
 const { ensureFreshSession } = require("./refresh_moodle_session.js");
 
 async function main() {
   const url = process.argv[2];
   if (!url) {
-    console.error('Anna Moodle-sivun osoite parametrina: node debug_fetch_page.js "https://..."');
+    console.error('Anna Moodle-sivun osoite parametrina: node src/moodle/debug_fetch_page.js "https://..."');
     process.exit(1);
   }
 
@@ -35,9 +36,9 @@ async function main() {
   const html = await fetchMoodlePage(url, session);
   const idMatch = url.match(/[?&]id=(\d+)/);
   const outName = `debug_fetch_${idMatch ? idMatch[1] : Date.now()}.html`;
-  const outPath = path.join(__dirname, outName);
+  const outPath = debugFile(outName);
   fs.writeFileSync(outPath, html);
-  console.log(`Tallennettu: ${outName} (${html.length} merkkia)`);
+  console.log(`Tallennettu: debug/${outName} (${html.length} merkkia)`);
 }
 
 main().catch((err) => {

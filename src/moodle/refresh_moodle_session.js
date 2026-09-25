@@ -17,9 +17,9 @@
 // MOODLE_SESSION-evastetta (ks. README) ja hae se kasin DevToolsista.
 //
 // Kayttö:
-//   node refresh_moodle_session.js              # kirjautuu, paivittaa .env:in
-//   node refresh_moodle_session.js --dry-run    # kirjautuu, nayttaa tuloksen, ei kirjoita .env:iin
-//   node refresh_moodle_session.js --debug      # tulostaa hyppy hypylta mihin URL:eihin mentiin (ei salasanaa, ei sivujen sisaltoa)
+//   node src/moodle/refresh_moodle_session.js              # kirjautuu, paivittaa .env:in
+//   node src/moodle/refresh_moodle_session.js --dry-run    # kirjautuu, nayttaa tuloksen, ei kirjoita .env:iin
+//   node src/moodle/refresh_moodle_session.js --debug      # tulostaa hyppy hypylta mihin URL:eihin mentiin (ei salasanaa, ei sivujen sisaltoa)
 //
 // Tekninen tausta (Shibboleth SSO, ei koodattu kiinni tarkkoihin URL:eihin
 // paitsi ensimmaiseen laukaisuun, jotta pienet muutokset IdP:ssa eivat
@@ -43,10 +43,10 @@
 
 const fs = require("fs");
 const path = require("path");
-require("./load_env.js").loadEnvFile();
+require("../load_env.js").loadEnvFile();
 const { decodeEntities, looksLikeLoginPage, BASE_URL } = require("./scrape_course_content.js");
 
-const ENV_PATH = path.join(__dirname, ".env");
+const { ENV_PATH } = require("../paths.js");
 const LOGIN_TRIGGER_URL = `${BASE_URL}/login/index.php`;
 const MAX_RELAY_HOPS = 5;
 

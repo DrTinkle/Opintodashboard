@@ -12,9 +12,9 @@
 // linkin tekstiä kurssin "name"-kenttään.
 //
 // Käyttö:
-//   node find_moodle_ids.js --session "<MoodleSession-arvo>"
-//   node find_moodle_ids.js --session "..." --userid <oma numero>
-//   node find_moodle_ids.js --session "..." --dry-run
+//   node src/moodle/find_moodle_ids.js --session "<MoodleSession-arvo>"
+//   node src/moodle/find_moodle_ids.js --session "..." --userid <oma numero>
+//   node src/moodle/find_moodle_ids.js --session "..." --dry-run
 //
 // Tarvitset oman Moodle-käyttäjä-id:si (numero, näkyy mm. kalenterin
 // ICS-vientilinkin "userid="-parametrista tai omasta profiilisivustasi
@@ -24,12 +24,10 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
 const { decodeEntities, stripTags, fetchMoodlePage, BASE_URL } = require("./scrape_course_content.js");
-require("./load_env.js").loadEnvFile();
-
-const DATA_JSON_PATH = path.join(__dirname, "data.json");
-const BUILD_JS_PATH = path.join(__dirname, "build.js");
+require("../load_env.js").loadEnvFile();
+const { DATA_JSON_PATH, debugFile } = require("../paths.js");
+const { buildDataJs } = require("../build.js");
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -146,8 +144,8 @@ async function main() {
   const discovered = extractCourseLinks(html);
 
   if (opts.debug || discovered.size === 0) {
-    fs.writeFileSync(path.join(__dirname, "debug_profile.html"), html);
-    console.log(`(debug: koko sivu tallennettu -> debug_profile.html, ${html.length} merkkiä)`);
+    fs.writeFileSync(debugFile("debug_profile.html"), html);
+    console.log(`(debug: koko sivu tallennettu -> debug/debug_profile.html, ${html.length} merkkiä)`);
   }
 
   if (discovered.size === 0) {
@@ -212,7 +210,7 @@ async function main() {
 
   if (anyChanged) {
     fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n");
-    execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
+    buildDataJs(data);
     console.log("\ndata.json ja data.js päivitetty.");
   } else {
     console.log("\nEi muutoksia data.json:iin.");

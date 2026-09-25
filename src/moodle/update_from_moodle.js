@@ -7,9 +7,9 @@
 // logiikan ja päivittää myös data.js:n.
 //
 // Käyttö:
-//   node update_from_moodle.js --url "https://moodle5.samk.fi/calendar/export_execute.php?...&authtoken=..."
-//   node update_from_moodle.js --file kalenteri.ics
-//   node update_from_moodle.js --url "..." --dry-run     (näyttää mitä tehtäisiin, ei kirjoita mitään)
+//   node src/moodle/update_from_moodle.js --url "https://moodle5.samk.fi/calendar/export_execute.php?...&authtoken=..."
+//   node src/moodle/update_from_moodle.js --file kalenteri.ics
+//   node src/moodle/update_from_moodle.js --url "..." --dry-run     (näyttää mitä tehtäisiin, ei kirjoita mitään)
 //
 // Miten saat ICS-linkin Moodlesta:
 //   1. Kirjaudu Moodleen (moodle5.samk.fi) ja avaa Kalenteri
@@ -28,11 +28,10 @@
 
 const fs = require("fs");
 const path = require("path");
-require("./load_env.js").loadEnvFile();
-const { estimateWithDeepSeek } = require("./estimate_deepseek.js");
-
-const DATA_JSON = path.join(__dirname, "data.json");
-const DATA_JS = path.join(__dirname, "data.js");
+require("../load_env.js").loadEnvFile();
+const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js");
+const { DATA_JSON_PATH: DATA_JSON } = require("../paths.js");
+const { buildDataJs } = require("../build.js");
 
 // Kurssin tunnistus tehdään kokonaan data.json:in perusteella, joten skripti
 // toimii kenen tahansa kursseilla ilman koodimuutoksia (ks. matchCourse):
@@ -239,14 +238,6 @@ function guessType(summary, course) {
   return "event";
 }
 
-function writeDataJs(data) {
-  const header =
-    "// Opintodashboardin data.\n" +
-    "// TÄMÄ TIEDOSTO ON GENEROITU data.json:sta - älä muokkaa suoraan.\n" +
-    '// Muokkaa data.json:ia ja aja "node build.js" (tai update_from_moodle.js).\n\n';
-  fs.writeFileSync(DATA_JS, header + "const COURSES = " + JSON.stringify(data, null, 2) + ";\n", "utf8");
-}
-
 async function main() {
   const args = parseArgs();
   const icsText = await getIcsText(args);
@@ -324,7 +315,7 @@ async function main() {
 
   if (added > 0) {
     fs.writeFileSync(DATA_JSON, JSON.stringify(data, null, 2) + "\n", "utf8");
-    writeDataJs(data);
+    buildDataJs(data);
     console.log("\ndata.json ja data.js päivitetty.");
   } else {
     console.log("\nEi uutta lisättävää, tiedostoja ei koskettu.");

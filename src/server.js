@@ -5,8 +5,8 @@
 // (ei riippuvuuksia, pelkkää Node.js:n omaa http-moduulia).
 //
 // Käyttö:
-//   node server.js
-//   node server.js --port 3000
+//   node src/server.js
+//   node src/server.js --port 3000
 //
 // Avaa sitten selaimessa osoitteen jonka skripti tulostaa (oletuksena
 // http://localhost:8080). Selain avautuu myös automaattisesti.
@@ -16,7 +16,11 @@ const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
 
-const ROOT = __dirname;
+const { PUBLIC_DIR, ENV_PATH, migrateLegacyFiles } = require("./paths.js");
+
+// Vain public/-kansio tarjotaan selaimelle. Muut tiedostot (.env, data/,
+// koodi) eivät ole haettavissa palvelimen kautta.
+const ROOT = PUBLIC_DIR;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -77,7 +81,7 @@ function handleSyncRequest(req, res) {
   // sync_moodle.js:ssä olisi jokin virhe skriptiä ladattaessa.
   let runSync;
   try {
-    ({ runSync } = require("./sync_moodle.js"));
+    ({ runSync } = require("./moodle/sync_moodle.js"));
   } catch (err) {
     isSyncing = false;
     res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
@@ -126,7 +130,7 @@ function handleSyncGoogleRequest(req, res) {
   // syystä kuin sync_moodle.js Moodle-reitillä.
   let syncToGoogle;
   try {
-    syncToGoogle = require("./sync_to_google.js");
+    syncToGoogle = require("./integrations/sync_to_google.js");
   } catch (err) {
     isSyncingGoogle = false;
     res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
@@ -169,7 +173,6 @@ function handleSyncGoogleRequest(req, res) {
 // .env-tiedoston muut rivit (kommentit mukaan lukien) sellaisenaan. Vain
 // tunnetut avaimet (SETTINGS_KEYS) hyväksytään, jottei mielivaltaisia rivejä
 // voi kirjoittaa tiedostoon.
-const ENV_PATH = path.join(ROOT, ".env");
 const SETTINGS_KEYS = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
@@ -318,7 +321,26 @@ async function handleSettingsSaveRequest(req, res) {
   }
 }
 
+// Varmistaa ennen käynnistystä, että tiedostot ovat oikeissa paikoissa:
+// siirtää vanhan kansiorakenteen tiedostot ja generoi public/data.js:n
+// data/data.json:sta, jotta käsin tehdyt muutokset näkyvät aina, vaikka
+// "npm run build" olisi unohtunut.
+function prepareFiles() {
+  const paths = require("./paths.js");
+  migrateLegacyFiles().forEach((m) => console.log("Siirretty uuteen paikkaan: " + m));
+  if (!fs.existsSync(paths.DATA_JSON_PATH)) {
+    console.log('Huom: data/data.json puuttuu. Aja ensin "npm run setup".');
+    return;
+  }
+  try {
+    require("./build.js").buildDataJs();
+  } catch (err) {
+    console.error("Varoitus: data/data.json on virheellinen, käytetään edellistä public/data.js:ää (" + err.message + ")");
+  }
+}
+
 function main() {
+  prepareFiles();
   const { port } = parseArgs();
 
   const server = http.createServer((req, res) => {
@@ -377,7 +399,7 @@ function main() {
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      console.error(`Portti ${port} on jo käytössä. Kokeile toista porttia: node server.js --port 3000`);
+      console.error(`Portti ${port} on jo käytössä. Kokeile toista porttia: npm start -- --port 3000`);
       process.exit(1);
     }
     throw err;
