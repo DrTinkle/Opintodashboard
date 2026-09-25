@@ -31,6 +31,7 @@ const fs = require("fs");
 const path = require("path");
 require("../load_env.js").loadEnvFile();
 const { DATA_JSON_PATH, debugFile } = require("../paths.js");
+const { readData, writeData } = require("../json_file.js");
 const { buildDataJs } = require("../build.js");
 const BASE_URL = "https://moodle5.samk.fi";
 
@@ -100,8 +101,18 @@ function stripTags(s) {
   return s.replace(/<[^>]+>/g, "");
 }
 
+// Kurssi- ja tehtäväsivuilla kirjautumissivu tunnistetaan vain sivun
+// rakenteesta (sivun id tai kirjautumislomakkeen logintoken-kenttä), ei
+// tekstistä: kurssisivulla voi hyvin lukea "Kirjaudu sisään EXAMiin".
 function looksLikeLoginPage(html) {
-  return /id="page-login-index"/i.test(html) || /Kirjaudu sisään/i.test(html) || /Log in to the site/i.test(html);
+  return /id="page-login-index"/i.test(html) || /name="logintoken"/i.test(html);
+}
+
+// Kirjautumisen (refresh_moodle_session.js) oma, väljempi tarkistus: se
+// tutkii vain Moodlen kirjautumisosoitetta, jossa tekstikin on luotettava.
+// Pidetään ennallaan, koska kirjautumisketju on testattu sillä.
+function looksLikeLoginPageLoose(html) {
+  return looksLikeLoginPage(html) || /Kirjaudu sisään/i.test(html) || /Log in to the site/i.test(html);
 }
 
 function splitSections(html) {
@@ -385,6 +396,9 @@ async function fetchMoodlePage(url, session) {
       "Palvelin ohjasi uudelleen (todennäköisesti kirjautumissivulle) - MoodleSession-eväste on vanhentunut, hae uusi selaimesta."
     );
   }
+  if (!res.ok) {
+    throw new Error("Moodle vastasi HTTP " + res.status + " (esim. huoltokatko), sivua ei voitu lukea.");
+  }
   const html = await res.text();
   if (looksLikeLoginPage(html)) {
     throw new Error("Sivu näyttää kirjautumissivulta - MoodleSession-eväste on vanhentunut tai väärä.");
@@ -422,7 +436,7 @@ async function main() {
     process.exit(1);
   }
 
-  const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
+  const { data, mtimeMs: dataMtime } = readData(DATA_JSON_PATH);
   const courses = data.filter((c) => c.moodleId && (opts.course == null || c.moodleId === opts.course));
 
   if (courses.length === 0) {
@@ -481,7 +495,7 @@ async function main() {
   }
 
   if (anyChanged) {
-    fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n");
+    writeData(data, dataMtime, DATA_JSON_PATH);
     buildDataJs(data);
     console.log("data.json ja data.js päivitetty.");
   }
@@ -508,6 +522,7 @@ module.exports = {
   decodeEntities,
   stripTags,
   looksLikeLoginPage,
+  looksLikeLoginPageLoose,
   fetchMoodlePage,
   TEXT_CONTENT_TYPES,
   BASE_URL,

@@ -31,6 +31,7 @@ const path = require("path");
 require("../load_env.js").loadEnvFile();
 const { estimateWithDeepSeek } = require("../integrations/estimate_deepseek.js");
 const { DATA_JSON_PATH: DATA_JSON } = require("../paths.js");
+const { readData, writeData } = require("../json_file.js");
 const { buildDataJs } = require("../build.js");
 
 // Kurssin tunnistus tehdään kokonaan data.json:in perusteella, joten skripti
@@ -123,7 +124,23 @@ function decodeIcsText(v) {
 }
 
 function icsDateToIso(dtstart) {
-  // "20261012" (koko päivä) tai "20261012T230000Z" (kellonaikaan sidottu)
+  // "20261012" (koko päivä), "20261012T230000" (paikallinen aika) tai
+  // "20261012T213000Z" (UTC). UTC-aika muunnetaan Suomen aikaan ennen kuin
+  // päivä otetaan: 14.10. klo 00:30 Suomessa on UTC:nä 13.10. klo 21:30, ja
+  // pelkkä päiväosa antaisi päivää liian aikaisen päivän.
+  const utc = dtstart.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+  if (utc) {
+    const [, y, mo, d, h, mi, se] = utc.map(Number);
+    const instant = new Date(Date.UTC(y, mo - 1, d, h, mi, se));
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Helsinki",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(instant);
+    const get = (type) => parts.find((p) => p.type === type).value;
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  }
   const m = dtstart.match(/^(\d{4})(\d{2})(\d{2})/);
   if (!m) return null;
   const [, y, mo, d] = m;
@@ -261,7 +278,7 @@ async function main() {
   const args = parseArgs();
   const icsText = await getIcsText(args);
   const events = parseIcs(icsText);
-  const data = JSON.parse(fs.readFileSync(DATA_JSON, "utf8"));
+  const { data, mtimeMs: dataMtime } = readData(DATA_JSON);
 
   if (args.debug) {
     console.log("--- KAIKKI TAPAHTUMAT (--debug) ---");
@@ -333,7 +350,7 @@ async function main() {
   }
 
   if (added > 0) {
-    fs.writeFileSync(DATA_JSON, JSON.stringify(data, null, 2) + "\n", "utf8");
+    writeData(data, dataMtime, DATA_JSON);
     buildDataJs(data);
     console.log("\ndata.json ja data.js päivitetty.");
   } else {

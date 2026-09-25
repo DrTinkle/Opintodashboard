@@ -44,9 +44,14 @@
 const fs = require("fs");
 const path = require("path");
 require("../load_env.js").loadEnvFile();
-const { decodeEntities, looksLikeLoginPage, BASE_URL } = require("./scrape_course_content.js");
+const {
+  decodeEntities,
+  looksLikeLoginPageLoose: looksLikeLoginPage,
+  BASE_URL,
+} = require("./scrape_course_content.js");
 
 const { ENV_PATH } = require("../paths.js");
+const { writeTextAtomic } = require("../json_file.js");
 const LOGIN_TRIGGER_URL = `${BASE_URL}/login/index.php`;
 const MAX_RELAY_HOPS = 5;
 
@@ -347,7 +352,7 @@ function upsertEnvValue(key, value) {
   });
   if (!found) updated.push(`${key}=${value}`);
   while (updated.length && updated[updated.length - 1] === "") updated.pop();
-  fs.writeFileSync(ENV_PATH, updated.join("\n") + "\n");
+  writeTextAtomic(ENV_PATH, updated.join("\n") + "\n");
 }
 
 async function main() {

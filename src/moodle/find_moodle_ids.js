@@ -25,6 +25,7 @@ const path = require("path");
 const { decodeEntities, stripTags, fetchMoodlePage, BASE_URL } = require("./scrape_course_content.js");
 require("../load_env.js").loadEnvFile();
 const { DATA_JSON_PATH, debugFile } = require("../paths.js");
+const { readData, writeData } = require("../json_file.js");
 const { buildDataJs } = require("../build.js");
 
 function parseArgs() {
@@ -170,7 +171,7 @@ async function main() {
   }
   console.log(`Löytyi ${discovered.size} kurssilinkkiä sivulta.\n`);
 
-  const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
+  const { data, mtimeMs: dataMtime } = readData(DATA_JSON_PATH);
   const usedIds = new Set(data.filter((c) => c.moodleId).map((c) => c.moodleId));
   let anyChanged = false;
   const matchedReport = [];
@@ -222,7 +223,7 @@ async function main() {
   }
 
   if (anyChanged) {
-    fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n");
+    writeData(data, dataMtime, DATA_JSON_PATH);
     buildDataJs(data);
     console.log("\ndata.json ja data.js päivitetty.");
   } else {

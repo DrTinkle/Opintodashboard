@@ -31,6 +31,7 @@ const path = require("path");
 const CATALOG_BASE = "https://samk.opinto-opas.fi/app/rest/";
 const REQUEST_TIMEOUT_MS = 30000;
 const { DATA_JSON_PATH } = require("../paths.js");
+const { readData, writeData } = require("../json_file.js");
 
 // Opinto-oppaan toteutuskoodi, esim. "IC250105-3002" (opintojakso + toteutus).
 const REALIZATION_CODE_RE = /\b([A-Z]{2,}[0-9A-Z]{3,}-\d{4})\b/;
@@ -267,7 +268,7 @@ const FIELD_LABELS = { code: "koodi", credits: "op", start: "alkaa", end: "pää
 async function main() {
   require("../load_env.js").loadEnvFile();
   const dryRun = process.argv.includes("--dry-run");
-  const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
+  const { data, mtimeMs: dataMtime } = readData(DATA_JSON_PATH);
   const changes = await enrichFromCatalog(data, { log: (m) => console.log(m) });
 
   if (!changes.length) {
@@ -284,7 +285,7 @@ async function main() {
     console.log("\n[DRY-RUN] Mitään ei kirjoitettu.");
     return;
   }
-  fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
+  writeData(data, dataMtime, DATA_JSON_PATH);
   require("../build.js").buildDataJs(data);
   console.log("\ndata.json ja data.js päivitetty.");
 }

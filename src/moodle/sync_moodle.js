@@ -32,6 +32,7 @@ const fs = require("fs");
 const path = require("path");
 require("../load_env.js").loadEnvFile();
 const { DATA_JSON_PATH, SYNC_REPORT_PATH: REPORT_PATH } = require("../paths.js");
+const { readData, writeData, writeJsonAtomic } = require("../json_file.js");
 const { buildDataJs } = require("../build.js");
 
 const {
@@ -249,11 +250,13 @@ async function discoverAndAddNewCourses(data, session, baseUrl, opts) {
 
   // 2) Loput loydetyt kurssit joita ei voi tasmayttaa mihinkaan olemassa
   //    olevaan (ei jo kaytossa, eika riittavan hyvaa nimitasmaytysta) ovat
-  //    aidosti uusia.
+  //    aidosti uusia. Nimeä verrataan vain kursseihin, joilla ei ole vielä
+  //    moodleId:tä: kurssi, jolla on eri moodleId, on eri Moodle-kurssi
+  //    (esim. "Matematiikka 2", kun "Matematiikka 1" on jo listalla).
   discovered.forEach((labels, id) => {
     if (usedIds.has(id)) return;
     let bestNameScore = 0;
-    data.forEach((course) => {
+    data.filter((course) => !course.moodleId).forEach((course) => {
       labels.forEach((label) => {
         const score = scoreMatch(course, label);
         if (score > bestNameScore) bestNameScore = score;
@@ -312,6 +315,16 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
     summary.errors.push(`[${course.id}] sisällön jäsennys epäonnistui: ${err.message}`);
     return;
   }
+  // Tyhjä tulos sisällöllisestä kurssista on lähes aina virhesivu tai
+  // muuttunut sivurakenne, ei oikeasti tyhjentynyt kurssi: säilytetään
+  // vanha sisältö ja kerrotaan virheestä.
+  const hadItems = (course.topics || []).some((t) => (t.items || []).length);
+  const hasItems = (topics || []).some((t) => (t.items || []).length);
+  if (hadItems && !hasItems) {
+    stat.error = "kurssisivulta ei löytynyt sisältöä";
+    summary.errors.push(`[${course.id}] kurssisivulta ei löytynyt sisältöä, vanha sisältö säilytettiin`);
+    return;
+  }
   course.topics = topics;
   summary.coursesScanned++;
 
@@ -346,15 +359,29 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
       // kaksi samannäköistä Moodle-tehtävää ei voi "löytää" toisiaan.
       // Käsin lisätyt (ei moodleUrl:ia) täsmätään otsikon perusteella, ja
       // osuma sidotaan aktiviteettiin seuraavia hakuja varten.
+      // Aktiviteettiin jo sidottu deadline täsmää päivästä riippumatta: jos
+      // opettaja on siirtänyt määräaikaa, päivä päivitetään ja vanha päivä
+      // kirjataan movedFrom-listaan. Käyttöliittymä siirtää sen avulla
+      // tehtävän tilan, arviot ja muokkaukset uudelle päivälle.
       const activityUrl = normalizeActivityUrl(item.url);
-      const match = course.deadlines.find(
-        (d) =>
-          d.date === isoDate &&
-          (d.moodleUrl ? d.moodleUrl === activityUrl : isSameDeadline(d.title, item.title))
-      );
-      if (match && !match.moodleUrl && activityUrl) {
-        match.moodleUrl = activityUrl;
-        summary.linked++;
+      let match = activityUrl ? course.deadlines.find((d) => d.moodleUrl === activityUrl) : null;
+      if (!match) {
+        match = course.deadlines.find(
+          (d) => !d.moodleUrl && d.date === isoDate && isSameDeadline(d.title, item.title)
+        );
+        if (match && activityUrl) {
+          match.moodleUrl = activityUrl;
+          summary.linked++;
+        }
+      }
+      if (match && match.date !== isoDate) {
+        const from = match.date;
+        match.movedFrom = Array.from(new Set([...(match.movedFrom || []), from]));
+        match.date = isoDate;
+        stat.moved = (stat.moved || 0) + 1;
+        summary.moved.push({ course: course.id, courseName: course.name, title: match.title, from, to: isoDate });
+        stat.items.push({ title: item.title, date: isoDate, status: "moved", from, matchedTo: match.title });
+        continue;
       }
       if (match) {
         stat.known++;
@@ -462,6 +489,7 @@ async function runSync(opts = {}) {
     dueFound: 0,
     alreadyKnown: 0,
     linked: 0,
+    moved: [],
     courses: [],
     errors: [],
     changed: false,
@@ -470,8 +498,15 @@ async function runSync(opts = {}) {
   let session = process.env.MOODLE_SESSION || null;
   if (process.env.MOODLE_USERNAME && process.env.MOODLE_PASSWORD) {
     const { ensureFreshSession } = require("./refresh_moodle_session.js");
-    const result = await ensureFreshSession(session);
-    if (result.session) session = result.session;
+    try {
+      const result = await ensureFreshSession(session);
+      if (result.session) session = result.session;
+    } catch (err) {
+      // Kirjautumispalvelun häiriö ei kaada synkkaa, jos tallennettu
+      // istunto on olemassa: yritetään sillä.
+      if (!session) throw err;
+      summary.errors.push("Automaattinen kirjautuminen epäonnistui (" + err.message + "), käytettiin tallennettua istuntoa.");
+    }
   }
   if (!session) {
     throw new Error(
@@ -479,7 +514,7 @@ async function runSync(opts = {}) {
     );
   }
 
-  const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
+  const { data, mtimeMs: dataMtime } = readData(DATA_JSON_PATH);
 
   const courseResult = await discoverAndAddNewCourses(data, session, opts.baseUrl, opts);
   if (courseResult.error) summary.errors.push(courseResult.error);
@@ -511,22 +546,27 @@ async function runSync(opts = {}) {
     summary.newCourses.length > 0 ||
     summary.newTasks.length > 0 ||
     summary.catalogFilled.length > 0 ||
-    summary.linked > 0;
+    summary.linked > 0 ||
+    summary.moved.length > 0;
+
+  let saveError = null;
   if (summary.changed) {
-    fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
-    buildDataJs(data);
+    try {
+      writeData(data, dataMtime, DATA_JSON_PATH);
+      buildDataJs(data);
+    } catch (err) {
+      saveError = err;
+      summary.errors.push("Tallennus epäonnistui: " + err.message);
+    }
   }
 
   try {
-    fs.writeFileSync(
-      REPORT_PATH,
-      JSON.stringify({ finishedAt: new Date().toISOString(), ...summary }, null, 2) + "\n",
-      "utf8"
-    );
+    writeJsonAtomic(REPORT_PATH, { finishedAt: new Date().toISOString(), ...summary });
   } catch (err) {
     // Raportti on vain apuväline, sen kirjoitus ei saa kaataa synkkaa.
   }
 
+  if (saveError) throw saveError;
   return summary;
 }
 

@@ -37,6 +37,7 @@ const {
   TOKEN_PATH,
   SYNC_STATE_PATH: STATE_PATH,
 } = require("../paths.js");
+const { writeJsonAtomic } = require("../json_file.js");
 
 const SCOPES = ["https://www.googleapis.com/auth/tasks", "https://www.googleapis.com/auth/calendar"];
 const DEFAULT_TASKLIST_NAME = "Koulu - Deadlinet";
@@ -89,7 +90,7 @@ function loadJson(p, fallback) {
 }
 
 function saveJson(p, obj) {
-  fs.writeFileSync(p, JSON.stringify(obj, null, 2) + "\n");
+  writeJsonAtomic(p, obj);
 }
 
 function shortHash(value) {

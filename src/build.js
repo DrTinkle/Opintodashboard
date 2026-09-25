@@ -13,6 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 const { DATA_JSON_PATH, DATA_JS_PATH } = require("./paths.js");
+const { writeTextAtomic } = require("./json_file.js");
 
 function buildDataJs(data) {
   const courses = data || JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
@@ -21,7 +22,7 @@ function buildDataJs(data) {
     "// TÄMÄ TIEDOSTO ON GENEROITU data/data.json:sta - älä muokkaa suoraan.\n" +
     '// Muokkaa data/data.json:ia ja aja "npm run build".\n\n';
   fs.mkdirSync(path.dirname(DATA_JS_PATH), { recursive: true });
-  fs.writeFileSync(DATA_JS_PATH, header + "const COURSES = " + JSON.stringify(courses, null, 2) + ";\n", "utf8");
+  writeTextAtomic(DATA_JS_PATH, header + "const COURSES = " + JSON.stringify(courses, null, 2) + ";\n");
   return courses.length;
 }
 

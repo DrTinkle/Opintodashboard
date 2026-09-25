@@ -1637,6 +1637,38 @@
       }
     });
   }
+
+  // Opettajan siirtämä määräaika: Moodle-synkka päivittää deadlinen päivän
+  // ja kirjaa vanhat päivät movedFrom-listaan. Selaimen merkinnät (tila,
+  // arvio/tahti, valmiusprosentti, muokkaukset) on avattu päivällä
+  // (itemKey), joten ne siirretään vanhalta avaimelta uudelle, jos uudella
+  // ei vielä ole omaa merkintää. Vanha avain jätetään paikalleen.
+  function migrateMovedDeadlines() {
+    const stores = [
+      [statusMap, saveStatusMap],
+      [planMap, savePlanMap],
+      [progressMap, saveProgressMap],
+      [editsMap, saveEditsMap],
+    ];
+    const changed = new Set();
+    COURSES.forEach((course) => {
+      (course.deadlines || []).forEach((d) => {
+        if (!Array.isArray(d.movedFrom) || !d.movedFrom.length) return;
+        const newKey = itemKey(course.id, d);
+        d.movedFrom.forEach((oldDate) => {
+          const oldKey = itemKey(course.id, { date: oldDate, title: d.title });
+          stores.forEach(([map], i) => {
+            if (map[oldKey] !== undefined && map[newKey] === undefined) {
+              map[newKey] = map[oldKey];
+              changed.add(i);
+            }
+          });
+        });
+      });
+    });
+    changed.forEach((i) => stores[i][1](stores[i][0]));
+  }
+  migrateMovedDeadlines();
   rebuildAllItems();
 
   function getExamWindowInfo(courseId) {
@@ -4041,6 +4073,7 @@
     if (s.newCourses && s.newCourses.length) news.push(s.newCourses.length + " uutta kurssia");
     if (s.newTasks && s.newTasks.length) news.push(s.newTasks.length + " uutta tehtävää");
     if (s.catalogFilled && s.catalogFilled.length) news.push(s.catalogFilled.length + " kurssin tiedot täydennetty");
+    if (s.moved && s.moved.length) news.push(s.moved.length + " määräaikaa siirtynyt");
     let text;
     let isError = false;
     let isWarn = false;
@@ -4072,8 +4105,12 @@
     const lines = (s.courses || []).map(
       (c) =>
         c.name + ": " + c.activities + " tehtävää, " + c.withDue + " määräaikaa, " + c.known + " jo listalla" +
-        (c.added ? ", " + c.added + " uutta" : "") + (c.error ? " (virhe: " + c.error + ")" : "")
+        (c.added ? ", " + c.added + " uutta" : "") + (c.moved ? ", " + c.moved + " siirtynyt" : "") +
+        (c.error ? " (virhe: " + c.error + ")" : "")
     );
+    (s.moved || []).forEach((m) => {
+      lines.push(m.courseName + ": " + m.title + " siirtyi " + m.from + " → " + m.to);
+    });
     if (errors.length) lines.push("", "Virheet:", ...errors);
     if (isWarn) lines.push("", "Yksityiskohdat: data/sync_report.json");
     return { text, isError, isWarn, tooltip: lines.join("\n") };
