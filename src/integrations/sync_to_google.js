@@ -201,12 +201,29 @@ function openBrowser(url) {
 
 // --- OAuth2 (loopback-kirjautuminen, sama periaate kuin Google Cloud SDK / gcloud kayttaa) ---
 
+// Kirjautumisen enimmäisaika: jos käyttäjä sulkee välilehden, odottaminen
+// ei saa jatkua ikuisesti (dashboardin "Vie Googleen" jäisi lukkoon).
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+
 function loginWithBrowser(creds) {
-  return new Promise((resolve, reject) => {
+  return new Promise((outerResolve, outerReject) => {
     let port;
+    // Satunnainen state-arvo: vain tämän kirjautumisen paluuosoite kelpaa.
+    const expectedState = crypto.randomBytes(16).toString("hex");
+    let timer = null;
+    const finish = (fn) => (value) => {
+      clearTimeout(timer);
+      fn(value);
+    };
+    const resolve = finish(outerResolve);
+    const reject = finish(outerReject);
     const server = http.createServer((req, res) => {
-      handleOAuthCallback(req, res, creds, port, server, resolve, reject);
+      handleOAuthCallback(req, res, creds, port, server, resolve, reject, expectedState);
     });
+    timer = setTimeout(() => {
+      server.close();
+      outerReject(new Error("Google-kirjautuminen aikakatkaistiin (5 min). Yritä uudelleen."));
+    }, LOGIN_TIMEOUT_MS);
     server.on("error", reject);
     server.listen(0, "127.0.0.1", () => {
       port = server.address().port;
@@ -218,6 +235,7 @@ function loginWithBrowser(creds) {
       authUrl.searchParams.set("scope", SCOPES.join(" "));
       authUrl.searchParams.set("access_type", "offline");
       authUrl.searchParams.set("prompt", "consent");
+      authUrl.searchParams.set("state", expectedState);
 
       console.log("\nAvataan selain Google-kirjautumista varten.");
       console.log("Jos selain ei avaudu itsestaan, kopioi tama linkki selaimeen:\n");
@@ -227,11 +245,16 @@ function loginWithBrowser(creds) {
   });
 }
 
-async function handleOAuthCallback(req, res, creds, port, server, resolve, reject) {
+async function handleOAuthCallback(req, res, creds, port, server, resolve, reject, expectedState) {
   try {
     const url = new URL(req.url, "http://127.0.0.1");
     const error = url.searchParams.get("error");
     const code = url.searchParams.get("code");
+    if ((code || error) && url.searchParams.get("state") !== expectedState) {
+      res.writeHead(400);
+      res.end("Virheellinen kirjautumispyyntö (state ei täsmää).");
+      return;
+    }
     if (error) {
       res.end("Kirjautuminen peruttiin tai epaonnistui. Voit sulkea taman valilehden.");
       server.close();
@@ -325,9 +348,24 @@ async function apiRequest(accessToken, method, url, body) {
   return res.json();
 }
 
+// Hakee kaikki sivut (Google palauttaa oletuksena vain osan kerrallaan).
+async function listAll(accessToken, url) {
+  const items = [];
+  let pageToken = null;
+  do {
+    const u = new URL(url);
+    u.searchParams.set("maxResults", "100");
+    if (pageToken) u.searchParams.set("pageToken", pageToken);
+    const page = await apiRequest(accessToken, "GET", u.toString());
+    items.push(...((page && page.items) || []));
+    pageToken = page && page.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+
 async function findOrCreateTaskList(accessToken, name, dryRun) {
-  const list = await apiRequest(accessToken, "GET", `${TASKS_API}/users/@me/lists`);
-  const existing = (list.items || []).find((t) => t.title === name);
+  const items = await listAll(accessToken, `${TASKS_API}/users/@me/lists`);
+  const existing = items.find((t) => t.title === name);
   if (existing) return existing.id;
   if (dryRun) return "DRY_RUN_TASKLIST_ID";
   const created = await apiRequest(accessToken, "POST", `${TASKS_API}/users/@me/lists`, { title: name });
@@ -335,8 +373,8 @@ async function findOrCreateTaskList(accessToken, name, dryRun) {
 }
 
 async function findOrCreateCalendar(accessToken, name, dryRun) {
-  const list = await apiRequest(accessToken, "GET", `${CAL_API}/users/me/calendarList`);
-  const existing = (list.items || []).find((c) => c.summary === name);
+  const items = await listAll(accessToken, `${CAL_API}/users/me/calendarList`);
+  const existing = items.find((c) => c.summary === name);
   if (existing) return existing.id;
   if (dryRun) return "DRY_RUN_CALENDAR_ID";
   const created = await apiRequest(accessToken, "POST", `${CAL_API}/calendars`, { summary: name });
@@ -434,14 +472,30 @@ async function main(overrideOpts) {
       return;
     }
 
+    // Aiemmin luotua kohdetta päivitetään vain, jos se on samassa listassa/
+    // kalenterissa ja samaa lajia. Muuten (lista luotu uudelleen, tyyppi
+    // vaihtunut) luodaan uusi.
+    const listId = kind === "task" ? tasklistId : calendarId;
+    let existingId = prev && prev.kind === kind && prev.listId === listId ? prev.id : null;
+    const upsert = (id) =>
+      kind === "task" ? upsertTask(accessToken, tasklistId, id, body) : upsertEvent(accessToken, calendarId, id, body);
+
     let result;
-    if (kind === "task") {
-      result = await upsertTask(accessToken, tasklistId, prev && prev.id, body);
-      state[key] = { kind, id: result.id, listId: tasklistId, hash };
-    } else {
-      result = await upsertEvent(accessToken, calendarId, prev && prev.id, body);
-      state[key] = { kind, id: result.id, listId: calendarId, hash };
+    try {
+      result = await upsert(existingId);
+    } catch (err) {
+      // Käyttäjä on poistanut kohteen Googlesta: luodaan uusi eikä kaaduta.
+      if (existingId && /-> (404|410):/.test(err.message)) {
+        existingId = null;
+        result = await upsert(null);
+      } else {
+        throw err;
+      }
     }
+    state[key] = { kind, id: result.id, listId, hash };
+    // Tallennetaan heti: jos myöhempi kohde epäonnistuu, jo luotuja ei
+    // luoda seuraavalla kerralla uudelleen.
+    saveJson(STATE_PATH, state);
 
     if (prev) {
       updated++;
