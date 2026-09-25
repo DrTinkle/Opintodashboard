@@ -1640,6 +1640,14 @@
     return info.type || (defaultBookBy ? "exam-system" : null);
   }
 
+  // Onko kohde EXAM-järjestelmän tentti: sillä on varausikkuna JA kurssin
+  // tenttivalinta on EXAM-järjestelmä. Moodle-tentillä voi olla sama
+  // aikaikkuna (examWindowStart/End), mutta EXAM-ajanvarausta ei ole, joten
+  // varattavuustekstiä ja EXAM-palkkeja ei näytetä sille.
+  function isExamSystemItem(item) {
+    return !!(item.examWindowStart && item.examWindowEnd && getEffectiveExamChoice(item.courseId) === "exam-system");
+  }
+
   // EXAM-järjestelmässä ajan voi varata vain n. EXAM_BOOKING_HORIZON_DAYS
   // vuorokautta etukäteen, joten vaikka koko ikkuna olisi tiedossa, kaikki
   // sen ajat eivät välttämättä näy järjestelmässä vielä. Tämä kertoo onko
@@ -2113,7 +2121,7 @@
       progressRow.appendChild(document.createTextNode(" %"));
       titleCell.appendChild(progressRow);
     }
-    if (item.examWindowStart && item.examWindowEnd && !getExamOverride(item)) {
+    if (isExamSystemItem(item) && !getExamOverride(item)) {
       const avail = getExamAvailability(item.courseId, item.examWindowEnd);
       const availNote = document.createElement("div");
       availNote.className = "notes exam-avail-note exam-avail-" + avail.status;
@@ -2989,7 +2997,7 @@
     const bars = [];
     allItems.forEach((it) => {
       if (!isVisible(it)) return;
-      if (!it.examWindowStart || !it.examWindowEnd) return;
+      if (!isExamSystemItem(it)) return;
       if (getExamOverride(it)) return;
       const windowStart = parseDate(it.examWindowStart);
       const windowEnd = parseDate(it.examWindowEnd);
