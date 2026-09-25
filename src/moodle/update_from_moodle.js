@@ -210,7 +210,26 @@ function significantWords(title) {
 // deadlineksi. Näin käsin kirjoitettu "GC - I Asennus - Linux vm" ja Moodlen
 // raaka "Pakollinen -  GC - I Asennus - Linux vm on palautettava viimeistään"
 // tunnistetaan samaksi eikä tule tuplaa.
+// Numerot ja roomalaiset numerot ("3", "I", "II") erottavat muuten
+// samannimiset tehtävät, esim. "Azure - I Asennus" ja "Azure - II Asennus".
+// Jos molemmissa otsikoissa on tällaisia eikä yksikään ole yhteinen, kyse on
+// eri tehtävistä, vaikka muita yhteisiä sanoja olisi.
+const ROMAN_NUMERAL_RE = /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/;
+function distinguishingTokens(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[()"“”,.:;\-–]/g, " ")
+    .split(/\s+/)
+    .filter((w) => /^\d+$/.test(w) || ROMAN_NUMERAL_RE.test(w))
+    .map((w) => (/^\d+$/.test(w) ? String(Number(w)) : w));
+}
+
 function isSameDeadline(existingTitle, incomingTitle) {
+  const existingTokens = new Set(distinguishingTokens(existingTitle));
+  const incomingTokens = distinguishingTokens(incomingTitle);
+  if (existingTokens.size && incomingTokens.length && !incomingTokens.some((t) => existingTokens.has(t))) {
+    return false;
+  }
   const existingWords = new Set(significantWords(existingTitle));
   const incomingWords = significantWords(incomingTitle);
   return incomingWords.some((w) => existingWords.has(w));

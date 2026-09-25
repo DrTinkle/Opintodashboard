@@ -135,6 +135,7 @@ Omat tiedostot `data/`-kansiossa (kaikki `.gitignore`:ssa): `data.json`
 | `estimatedHours` | number | Oletusarvio työmäärästä (h) |
 | `estimatedPace` | number | Oletustahti (h/vko) |
 | `examWindowStart`, `examWindowEnd` | `"YYYY-MM-DD"` | EXAM-varausikkuna |
+| `moodleUrl` | string | Moodle-aktiviteetti, josta deadline on haettu (synkka asettaa) |
 
 Deadlinella ei ole omaa id:tä. Kaikki selaimen tallennus avataan
 yhdistelmällä `kurssin id | päivä | otsikko` (ks. `itemKey()`
@@ -261,9 +262,10 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   jokaiseen pyyntöön `lang=en`. Näin sivut ovat kaikilla englanniksi, ja
   jäsennys (päivämäärät, otsikot) toimii samoin kaikille.
 - **Deadlinet:** tehtäväsivun `data-region="activity-dates"` sisältää
-  "Opened:"/"Due:"-rivit. Monella quiz-tyyppisellä
-  harjoituksella ei ole muodollista määräaikaa; sellaiset jätetään
-  lisäämättä.
+  "Opened:"/"Due:"-rivit. Aikaikkunallisilla harjoituksilla ja tenteillä
+  (quiz) määräaika on "Closes:" tai jo mennyt "Closed:", ja sitä käytetään,
+  jos "Due:"-riviä ei ole. Osalla quizeista ei ole kumpaakaan (esim.
+  labrojen esityöt); sellaiset jätetään lisäämättä.
 - **ICS-tuonnin kurssitunnistus** (`update_from_moodle.js`, `matchCourse()`)
   perustuu kokonaan `data.json`:iin, ei kovakoodattuihin kursseihin:
   1. kurssikoodi tai koko nimi tapahtuman CATEGORIES-kentässä (SAMKin
@@ -278,9 +280,13 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   kaikki kentät, ja korjaus on lisätä kurssille `moodleKeywords`.
 - **Labrat:** tyypiksi tulee `lab`, jos kurssin nimessä on "laboraatio"
   tai "labra" tai tehtävän otsikossa "labra".
-- **Duplikaatit:** otsikot verrataan merkitsevien sanojen perusteella
-  (`isSameDeadline()`); pelkät numerot säilytetään aina, jotta
-  "Viikkotehtävä 1" ja "Viikkotehtävä 2" eivät sekoitu.
+- **Duplikaatit:** synkan lisäämä deadline tallentaa aktiviteettinsa
+  osoitteen (`moodleUrl`) ja täsmää jatkossa vain siihen. Käsin lisätyt
+  verrataan samana päivänä otsikon merkitsevien sanojen perusteella
+  (`isSameDeadline()`), ja osuma sidotaan aktiviteettiin. Numerot ja
+  roomalaiset numerot erottavat tehtävät: jos molemmissa otsikoissa on
+  niitä eikä yksikään ole yhteinen ("Azure - I" vs "Azure - II"), ne ovat
+  eri tehtäviä.
 - **Synkan raportti:** "Hae Moodlesta" kertoo, montako kurssia ja tehtävää
   tarkistettiin ja montako määräaikaa Moodlesta löytyi (joista jo listalla /
   uusia). Kurssikohtainen erittely näkyy tilatekstin päällä hiirellä, ja

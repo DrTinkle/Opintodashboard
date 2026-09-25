@@ -101,12 +101,19 @@ const MONTHS_EN = {
 
 // Moodlen "activity-dates"-lohko on muotoa esim.
 // "Opened: Monday, 31 August 2026, 1:00 AM\n\nDue: Wednesday, 14 October
-// 2026, 11:59 PM" - aina englanniksi vaikka sivun muu sisalto on suomeksi
-// (ks. muistiinpanot find_deadlines.js:sta). Poimitaan vain "Due:"-rivi,
-// koska se on se paivamaara jota dashboard seuraa (ei "Opened:").
+// 2026, 11:59 PM" (sivut haetaan aina englanniksi, ks. fetchMoodlePage).
+// Palautustehtävillä (assign) määräaika on "Due:". Aikaikkunallisilla
+// harjoituksilla ja tenteillä (quiz) sitä ei ole, vaan ikkuna sulkeutuu:
+// "Closes:" tai jo mennyt "Closed:". "Due:" ensin, sitten sulkeutuminen.
+// "Opened:"/"Opens:" ei ole määräaika.
+function dateAfterLabel(text, label) {
+  const re = new RegExp("\\b" + label + "\\s*:\\s*[A-Za-z]+,\\s*(\\d{1,2})\\s+([A-Za-z]+)\\s+(\\d{4})", "i");
+  return text.match(re);
+}
+
 function parseDueDate(activityDatesText) {
   if (!activityDatesText) return null;
-  const m = activityDatesText.match(/\bDue\s*:\s*[A-Za-z]+,\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+  const m = dateAfterLabel(activityDatesText, "Due") || dateAfterLabel(activityDatesText, "Close[sd]?");
   if (!m) return null;
   const day = Number(m[1]);
   const month = MONTHS_EN[m[2].toLowerCase()];
@@ -143,10 +150,42 @@ function significantWords(title) {
     .filter((w) => (w.length > 2 || /^\d+$/.test(w)) && !GENERIC_WORDS.has(w));
 }
 
+// Numerot ja roomalaiset numerot ("3", "I", "II") erottavat muuten
+// samannimiset tehtävät, esim. "Azure - I Asennus" ja "Azure - II Asennus".
+// Jos molemmissa otsikoissa on tällaisia eikä yksikään ole yhteinen, kyse on
+// eri tehtävistä, vaikka muita yhteisiä sanoja olisi.
+const ROMAN_NUMERAL_RE = /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/;
+function distinguishingTokens(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[()"“”,.:;\-–]/g, " ")
+    .split(/\s+/)
+    .filter((w) => /^\d+$/.test(w) || ROMAN_NUMERAL_RE.test(w))
+    .map((w) => (/^\d+$/.test(w) ? String(Number(w)) : w));
+}
+
 function isSameDeadline(existingTitle, incomingTitle) {
+  const existingTokens = new Set(distinguishingTokens(existingTitle));
+  const incomingTokens = distinguishingTokens(incomingTitle);
+  if (existingTokens.size && incomingTokens.length && !incomingTokens.some((t) => existingTokens.has(t))) {
+    return false;
+  }
   const existingWords = new Set(significantWords(existingTitle));
   const incomingWords = significantWords(incomingTitle);
   return incomingWords.some((w) => existingWords.has(w));
+}
+
+// Moodle-aktiviteetin osoite ilman kieliparametria ja ankkuria, jotta sama
+// tehtävä tunnistetaan aina samaksi.
+function normalizeActivityUrl(url) {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("lang");
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return url || null;
+  }
 }
 
 function guessDeadlineType(item, course) {
@@ -301,9 +340,21 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
       stat.withDue++;
       summary.dueFound++;
 
+      // Moodlesta lisätyt deadlinet muistavat aktiviteettinsa osoitteen
+      // (moodleUrl). Sellainen täsmää vain omaan aktiviteettiinsa, joten
+      // kaksi samannäköistä Moodle-tehtävää ei voi "löytää" toisiaan.
+      // Käsin lisätyt (ei moodleUrl:ia) täsmätään otsikon perusteella, ja
+      // osuma sidotaan aktiviteettiin seuraavia hakuja varten.
+      const activityUrl = normalizeActivityUrl(item.url);
       const match = course.deadlines.find(
-        (d) => d.date === isoDate && isSameDeadline(d.title, item.title)
+        (d) =>
+          d.date === isoDate &&
+          (d.moodleUrl ? d.moodleUrl === activityUrl : isSameDeadline(d.title, item.title))
       );
+      if (match && !match.moodleUrl && activityUrl) {
+        match.moodleUrl = activityUrl;
+        summary.linked++;
+      }
       if (match) {
         stat.known++;
         summary.alreadyKnown++;
@@ -317,6 +368,7 @@ async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary
         date: isoDate,
         type: guessDeadlineType(item, course),
         notes: introText ? introText.slice(0, 500) : "",
+        moodleUrl: activityUrl,
       };
       // DeepSeek-aika-arvio VAIN aidosti uudelle tehtavalle (ei koskaan jo
       // tunnetuille - alreadyExists-tarkistus yllakin sen varmistaa), jotta
@@ -350,6 +402,7 @@ async function runSync(opts = {}) {
     activitiesScanned: 0,
     dueFound: 0,
     alreadyKnown: 0,
+    linked: 0,
     courses: [],
     errors: [],
     changed: false,
@@ -396,7 +449,10 @@ async function runSync(opts = {}) {
   });
 
   summary.changed =
-    summary.newCourses.length > 0 || summary.newTasks.length > 0 || summary.catalogFilled.length > 0;
+    summary.newCourses.length > 0 ||
+    summary.newTasks.length > 0 ||
+    summary.catalogFilled.length > 0 ||
+    summary.linked > 0;
   if (summary.changed) {
     fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
     buildDataJs(data);
@@ -425,7 +481,7 @@ function parseArgs() {
   return out;
 }
 
-module.exports = { runSync, parseDueDate, slugify, pickUnusedColor, isSameDeadline, guessDeadlineType };
+module.exports = { runSync, parseDueDate, slugify, pickUnusedColor, isSameDeadline, guessDeadlineType, normalizeActivityUrl };
 
 if (require.main === module) {
   runSync(parseArgs())
