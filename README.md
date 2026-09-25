@@ -53,12 +53,30 @@ npm-asennuksia.
    Asennus tarkistaa Node.js:n, luo omat `data/data.json`- ja `.env`-tiedostosi
    esimerkeistä ja valmistelee kurssidatan. Sen voi ajaa uudelleen
    turvallisesti: jo olemassa oleviin omiin tiedostoihin se ei koske.
+   Windowsissa `setup.bat` tarjoutuu myös luomaan työpöydälle
+   pikakuvakkeet **Opintodashboard** ja **Päivitä Opintodashboard**.
 3. **Käynnistä:**
-   ```
-   npm start
-   ```
-   Selain avautuu osoitteeseen http://localhost:8080. Palvelin pysyy
-   käynnissä komentoikkunassa, pysäytä se Ctrl+C:llä.
+   - **Windows:** tuplaklikkaa työpöydän **Opintodashboard**-kuvaketta
+     tai kansion `kaynnista.bat`-tiedostoa.
+   - **macOS / Linux:** `npm start`
+
+   Selain avautuu osoitteeseen http://localhost:8080. Dashboard on
+   käynnissä niin kauan kuin sen ikkuna on auki; sulje ikkuna (tai paina
+   Ctrl+C) lopettaaksesi. Jos dashboard on jo käynnissä, uusi käynnistys
+   vain avaa selaimen.
+
+## Päivitys
+
+- **Windows:** tuplaklikkaa **Päivitä Opintodashboard** -kuvaketta tai
+  `paivita.bat`-tiedostoa. Git-kloonissa se ajaa `git pull`, zipinä
+  ladatussa kansiossa se lataa uusimman version GitHubista ja kopioi sen
+  kansion päälle.
+- **macOS / Linux:** `git pull`, tai lataa uusi zip ja pura se vanhan
+  päälle.
+
+Omat asetuksesi (`.env`) ja tietosi (`data/`) säilyvät, koska ne eivät ole
+GitHubissa. Käynnistä dashboard päivityksen jälkeen uudelleen ja paina
+"Hae Moodlesta".
 
 ## Ensimmäinen käyttökerta
 
@@ -141,10 +159,11 @@ automaattisesti oikeisiin kansioihin.
 
 ## Ongelmatilanteita
 
-- **"Portti 8080 on jo käytössä":** käynnistä toiseen porttiin:
-  `npm start -- --port 3000`.
+- **"Portti 8080 on jo käytössä":** portissa on jokin muu ohjelma.
+  Käynnistä toiseen porttiin: `npm start -- --port 3000`.
 - **Asetukset tai Hae Moodlesta eivät toimi:** avaa dashboard
-  `npm start` -komennolla, ei suoraan `public/index.html`-tiedostona.
+  `kaynnista.bat`:lla tai `npm start` -komennolla, ei suoraan
+  `public/index.html`-tiedostona.
 - **Hae Moodlesta antaa kirjautumisvirheen:** tarkista tunnukset
   Asetuksista. Jos käytät pelkkää evästettä, se on voinut vanhentua:
   hae uusi.

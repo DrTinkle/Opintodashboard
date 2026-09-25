@@ -82,7 +82,11 @@ yksityiskohdat.
   sivut; käyttäjien Moodle voi muuten olla suomeksi.
 - **Windows:** käyttäjät ovat enimmäkseen Windowsilla. Älä käytä
   `cmd /c start`:ia URL:ien avaamiseen (katkaisee `&`-merkkiin), ja pidä
-  `.bat`-tiedostot CRLF-muodossa ja ASCII-merkeissä.
+  `.bat`- ja `.ps1`-tiedostot CRLF-muodossa ja ASCII-merkeissä (Windows
+  PowerShell 5 lukee BOM:ittoman tiedoston ANSI:na; ä-kirjain tehdään
+  merkkikoodista `[char]0x00E4`). Sulkeet `if (...)`-lohkon sisällä
+  olevassa `echo`-rivissä pitää escapeta (`^(`, `^)`). `paivita.bat` ajaa
+  itsensä kopiona `%TEMP%`:stä, koska päivitys voi korvata sen kesken ajon.
 
 ## Testaus
 

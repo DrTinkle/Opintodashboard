@@ -35,6 +35,14 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+echo.
+choice /C KE /M "Luodaanko tyopoydalle pikakuvakkeet (Opintodashboard ja Paivita)"
+if errorlevel 2 goto :askstart
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0src\windows\shortcuts.ps1"
+if errorlevel 1 echo Pikakuvakkeiden luonti epaonnistui. Voit kayttaa kaynnista.bat- ja paivita.bat-tiedostoja suoraan.
+
+:askstart
+echo.
 choice /C KE /M "Avataanko dashboard nyt"
 if errorlevel 2 exit /b 0
-node src/server.js
+call "%~dp0kaynnista.bat"

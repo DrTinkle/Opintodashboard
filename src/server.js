@@ -399,8 +399,23 @@ function main() {
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      console.error(`Portti ${port} on jo käytössä. Kokeile toista porttia: npm start -- --port 3000`);
-      process.exit(1);
+      // Jos portissa on jo käynnissä oleva dashboard (esim. kaynnista.bat
+      // tuplaklikattu toiseen kertaan), avataan vain selain siihen.
+      const url = `http://localhost:${port}`;
+      fetch(url + "/api/settings/status")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+        .then((body) => {
+          if (body && body.ok) {
+            console.log(`Opintodashboard on jo käynnissä osoitteessa ${url}. Avataan selain.`);
+            openInBrowser(url);
+            setTimeout(() => process.exit(0), 1500);
+          } else {
+            console.error(`Portti ${port} on jo käytössä. Kokeile toista porttia: npm start -- --port 3000`);
+            process.exit(1);
+          }
+        });
+      return;
     }
     throw err;
   });

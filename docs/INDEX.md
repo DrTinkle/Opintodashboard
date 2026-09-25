@@ -58,6 +58,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 .
 ├── README.md, AGENTS.md, package.json, .env.example
 ├── setup.bat, setup.sh          käyttöönotto (Windows / macOS, Linux)
+├── kaynnista.bat, paivita.bat   käynnistys ja päivitys Windowsissa
 ├── .env                         omat asetukset (ei gitissä)
 ├── public/
 │   ├── index.html               käyttöliittymä
@@ -81,7 +82,11 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 | `src/server.js` | HTTP-palvelin (`public/`) + API-reitit, oletusportti 8080 |
 | `src/paths.js` | Kaikki tiedostopolut ja vanhan rakenteen siirto |
 | `src/build.js` | `buildDataJs()`: generoi `public/data.js`:n `data/data.json`:sta |
-| `src/setup.js`, `setup.bat`, `setup.sh` | Käyttöönotto: Node-tarkistus, omat tiedostot esimerkeistä, build |
+| `src/setup.js`, `setup.bat`, `setup.sh` | Käyttöönotto: Node-tarkistus, omat tiedostot esimerkeistä, build. `setup.bat` tarjoaa työpöydän pikakuvakkeet |
+| `kaynnista.bat` | Käynnistää palvelimen ja avaa selaimen (Windows). Jos dashboard on jo käynnissä, `server.js` vain avaa selaimen |
+| `paivita.bat` | Päivitys: `git pull` git-kloonissa, muuten uusin zip GitHubista kansion päälle (`robocopy`). Ajaa itsensä kopiona `%TEMP%`:stä, koska päivitys voi korvata sen, ja lopuksi `setup.js`:n |
+| `src/windows/shortcuts.ps1` | Työpöydän pikakuvakkeet `kaynnista.bat`:lle ja `paivita.bat`:lle |
+| `public/icons/` | Kuvakkeet: `dashboard.ico` (myös selaimen favicon) ja `paivita.ico` |
 | `src/load_env.js` | Pieni `.env`-lukija, jota kaikki skriptit käyttävät |
 | `src/moodle/sync_moodle.js` | "Hae Moodlesta": uudet kurssit, sisältö ja deadlinet |
 | `src/moodle/update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |

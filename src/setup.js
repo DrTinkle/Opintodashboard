@@ -67,10 +67,15 @@ try {
   fail("data.js:n generointi epäonnistui: " + err.message);
 }
 
+const startHint =
+  process.platform === "win32"
+    ? "tuplaklikkaa kaynnista.bat (tai työpöydän pikakuvaketta)"
+    : "npm start      (tai: node src/server.js)";
+
 console.log(`
 Valmis! Seuraavaksi:
 
-  1. Käynnistä dashboard:   npm start      (tai: node src/server.js)
+  1. Käynnistä dashboard:   ${startHint}
   2. Selain avautuu osoitteeseen http://localhost:8080
   3. Avaa Asetukset-välilehti, täytä Moodle-kirjautuminen ja ryhmätunnus,
      ja paina sitten "Hae Moodlesta".
