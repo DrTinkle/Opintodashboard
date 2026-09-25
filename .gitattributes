@@ -1,0 +1,12 @@
+# Yhtenäiset rivinvaihdot riippumatta siitä, käyttääkö Windowsia, macOS:ää
+# vai Linuxia. Windowsin .bat-tiedostot tarvitsevat CRLF:n toimiakseen.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Kuvat ovat binääritiedostoja
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "esimerkkikurssi1",
+    "name": "Ohjelmoinnin perusteet",
+    "code": "OH101",
+    "credits": 5,
+    "teacher": "Etunimi Sukunimi",
+    "color": "#3b82f6",
+    "start": "2026-09-01",
+    "end": "2026-12-15",
+    "moodleId": null,
+    "deadlines": [
+      {
+        "title": "Viikkotehtävä 1",
+        "date": "2026-09-14",
+        "type": "task",
+        "notes": "Esimerkki - korvaa tämä omalla data.json:illasi.",
+        "estimatedHours": 4,
+        "estimatedPace": 2
+      },
+      {
+        "title": "Välitentti",
+        "date": "2026-10-20",
+        "type": "exam",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "esimerkkikurssi2",
+    "name": "Tietokannat",
+    "code": "TK202",
+    "credits": 4,
+    "teacher": "Etunimi Sukunimi",
+    "color": "#16a34a",
+    "start": "2026-09-01",
+    "end": "2026-12-15",
+    "moodleId": null,
+    "deadlines": [
+      {
+        "title": "Harjoitustyö",
+        "date": "2026-11-10",
+        "type": "task",
+        "notes": "",
+        "estimatedHours": 12,
+        "estimatedPace": 3
+      },
+      {
+        "title": "Tentti (EXAM-ikkuna esimerkki)",
+        "date": "2026-12-05",
+        "type": "exam",
+        "notes": "",
+        "examWindowStart": "2026-11-20",
+        "examWindowEnd": "2026-12-05"
+      }
+    ]
+  }
+]

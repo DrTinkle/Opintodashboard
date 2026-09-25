@@ -1,0 +1,4084 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opintodashboard</title>
+<style>
+  /* ==========================================================================
+     Design tokens
+     Kaikki värit, varjot ja pyöristykset tulevat näistä muuttujista, jotta
+     vaalea ja tumma teema pysyvät yhtenäisinä. Vanhat muuttujanimet
+     (--card-bg, --chip-bg jne.) on säilytetty, koska JS ja inline-tyylit
+     viittaavat osaan niistä.
+     ========================================================================== */
+  :root {
+    color-scheme: light;
+    --font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+
+    --bg: #f6f7f9;
+    --bg-soft: #f9fafb;
+    --card-bg: #ffffff;
+    --text: #111827;
+    --text-dim: #6b7280;
+    --text-faint: #9ca3af;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: #eff4ff;
+    --accent-ring: rgba(37, 99, 235, 0.22);
+    --accent-2: #7c3aed;
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+    --warn-border: #fde68a;
+    --ok: #15803d;
+    --ok-bg: #f0fdf4;
+    --chip-bg: #f3f4f6;
+    --chip-active-bg: #111827;
+    --chip-active-text: #ffffff;
+    --topbar-bg: rgba(246, 247, 249, 0.82);
+
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-lg: 0 20px 48px rgba(16, 24, 40, 0.18), 0 4px 12px rgba(16, 24, 40, 0.08);
+
+    --radius-xs: 6px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    --page-max: 1240px;
+    --control-h: 34px;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c0f;
+      --bg-soft: #111317;
+      --card-bg: #15171b;
+      --text: #e8e9ed;
+      --text-dim: #9a9ca5;
+      --text-faint: #6b6e77;
+      --border: #25272d;
+      --border-strong: #33363d;
+      --accent: #5b8cff;
+      --accent-hover: #7aa2ff;
+      --accent-soft: rgba(91, 140, 255, 0.12);
+      --accent-ring: rgba(91, 140, 255, 0.3);
+      --accent-2: #a78bfa;
+      --danger: #f87171;
+      --danger-bg: rgba(248, 113, 113, 0.12);
+      --warn: #fbbf24;
+      --warn-bg: rgba(251, 191, 36, 0.1);
+      --warn-border: rgba(251, 191, 36, 0.28);
+      --ok: #4ade80;
+      --ok-bg: rgba(74, 222, 128, 0.1);
+      --chip-bg: #1c1f24;
+      --chip-active-bg: #e8e9ed;
+      --chip-active-text: #0b0c0f;
+      --topbar-bg: rgba(11, 12, 15, 0.8);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
+      --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  /* ==========================================================================
+     Perusta
+     ========================================================================== */
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 80px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: var(--page-max); margin: 0 auto; padding: 28px 24px 64px; }
+  a { color: var(--accent); }
+  code {
+    font-family: var(--font-mono); font-size: 0.85em;
+    background: var(--chip-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 5px;
+  }
+  ::selection { background: var(--accent); color: #fff; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
+
+  button, .chip, a { -webkit-tap-highlight-color: transparent; }
+  button { font-family: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+  textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  .icon {
+    width: 16px; height: 16px; flex-shrink: 0;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .tabular, .num, .date-badge, .cell-startby, .day-num, .week-day-total { font-variant-numeric: tabular-nums; }
+
+  /* Näkymän vaihdon pehmeä sisääntulo */
+  @keyframes view-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  #dashboardView:not([hidden]), #calendarView:not([hidden]), #weekView:not([hidden]),
+  #settingsView:not([hidden]), #profileView:not([hidden]) { animation: view-in .22s var(--ease); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
+  /* ==========================================================================
+     Yläpalkki: brändi, navigaatio ja synkkatoiminnot
+     ========================================================================== */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--topbar-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: var(--page-max); margin: 0 auto; padding: 0 24px;
+    min-height: 60px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; flex-shrink: 0; }
+  .brand-mark {
+    width: 32px; height: 32px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12), var(--shadow-sm);
+  }
+  .brand-mark .icon { width: 18px; height: 18px; }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .brand-text h1 { margin: 0; font-size: 0.95rem; font-weight: 650; letter-spacing: -0.01em; }
+  .brand-text .sub { margin: 0; font-size: 0.72rem; color: var(--text-dim); font-weight: 500; }
+
+  .view-nav { display: flex; align-items: center; gap: 2px; }
+  .view-nav a {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 12px;
+    color: var(--text-dim); text-decoration: none;
+    font-size: 0.85rem; font-weight: 550;
+    border-radius: var(--radius-sm);
+    transition: background-color .15s var(--ease), color .15s var(--ease);
+    white-space: nowrap;
+  }
+  .view-nav a .icon { width: 15px; height: 15px; opacity: 0.85; }
+  .view-nav a:hover { color: var(--text); background: var(--chip-bg); }
+  .view-nav a.active { color: var(--text); background: var(--card-bg); box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--border); }
+  .view-nav a.active .icon { color: var(--accent); opacity: 1; }
+
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  /* Painikkeet ------------------------------------------------------------ */
+  .sync-btn, .add-task-btn, .calendar-header button, .modal-actions button, .settings-actions button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: var(--control-h); padding: 0 13px;
+    border-radius: var(--radius-sm);
+    font-size: 0.83rem; font-weight: 600; line-height: 1;
+    cursor: pointer; white-space: nowrap;
+    transition: background-color .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease), color .15s var(--ease);
+  }
+  /* toissijainen */
+  .sync-btn, .calendar-header button, .modal-actions button {
+    border: 1px solid var(--border-strong);
+    background: var(--card-bg);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+  .sync-btn:hover:not(:disabled), .calendar-header button:hover, .modal-actions button:hover {
+    background: var(--bg-soft); border-color: var(--text-faint);
+  }
+  .sync-btn .icon { color: var(--text-dim); }
+  .sync-btn:disabled { opacity: 0.6; cursor: progress; box-shadow: none; }
+  .sync-btn:disabled .icon { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ensisijainen */
+  .add-task-btn, .settings-actions button, .modal-actions button#taskFormSave {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .add-task-btn:hover, .settings-actions button:hover:not(:disabled), .modal-actions button#taskFormSave:hover {
+    background: var(--accent-hover); border-color: var(--accent-hover);
+  }
+  .add-task-btn .icon { width: 15px; height: 15px; }
+
+  .sync-statusbar {
+    display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px 18px;
+    margin: -12px 0 16px; min-height: 0;
+  }
+  .sync-statusbar:not(:has(.sync-status:not(:empty))) { display: none; }
+  .sync-status { font-size: 0.76rem; color: var(--text-dim); font-weight: 500; }
+  .sync-status:empty { display: none; }
+  .sync-status.sync-error { color: var(--danger); font-weight: 600; }
+  .sync-status.sync-ok { color: var(--ok); font-weight: 600; }
+
+  /* ==========================================================================
+     Otsikot, osiot, ohjelaatikot
+     ========================================================================== */
+  section { margin-bottom: 40px; }
+  h2 {
+    font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em;
+    margin: 0 0 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .section-head h2 { margin: 0; }
+  .section-sub { margin: -8px 0 14px; color: var(--text-dim); font-size: 0.83rem; }
+
+  .page-head { margin-bottom: 22px; }
+  .page-head h2 { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .page-head p { margin: 0; color: var(--text-dim); font-size: 0.88rem; }
+
+  /* Kokoontaitettava "Miten tämä toimii?" -ohje pitkien selitystekstien tilalla */
+  details.info-note {
+    margin: 0 0 16px;
+    font-size: 0.82rem; color: var(--text-dim);
+  }
+  details.info-note summary {
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; list-style: none; user-select: none;
+    font-weight: 550; color: var(--text-dim);
+    padding: 4px 0;
+    transition: color .15s;
+  }
+  details.info-note summary::-webkit-details-marker { display: none; }
+  details.info-note summary:hover { color: var(--text); }
+  details.info-note[open] summary { color: var(--text); }
+  details.info-note .info-body {
+    margin-top: 8px; padding: 12px 14px;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    line-height: 1.6;
+  }
+  details.info-note .info-body p { margin: 0 0 8px; }
+  details.info-note .info-body p:last-child { margin-bottom: 0; }
+
+  .callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px; margin: 0 0 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    font-size: 0.83rem; line-height: 1.6; color: var(--text-dim);
+  }
+  .callout .icon { margin-top: 2px; color: var(--accent); }
+  .callout.callout-warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+  .callout.callout-warn .icon { color: var(--warn); }
+  .callout[hidden] { display: none; }
+
+  .empty-note { color: var(--text-dim); font-size: 0.87rem; padding: 12px 2px; }
+  /* Tyhjä tila varsinaisen listan paikalla näytetään rajattuna laatikkona */
+  .deadline-list > .empty-note {
+    padding: 28px 16px; text-align: center;
+    background: var(--card-bg); border: 1px dashed var(--border-strong); border-radius: var(--radius-md);
+  }
+
+  /* ==========================================================================
+     Yhteenvetokortit (KPI)
+     ========================================================================== */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 0 0 36px;
+  }
+  .summary-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px 15px;
+    box-shadow: var(--shadow-sm);
+    min-width: 0;
+  }
+  .summary-card .kpi-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .summary-card .kpi-title { font-size: 0.78rem; font-weight: 550; color: var(--text-dim); }
+  .summary-card .kpi-icon {
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .summary-card .kpi-icon .icon { width: 15px; height: 15px; }
+  .summary-card .num { font-size: 1.65rem; font-weight: 650; line-height: 1.15; letter-spacing: -0.025em; margin-top: 8px; }
+  .summary-card .label {
+    color: var(--text-dim); font-size: 0.78rem; margin-top: 3px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ==========================================================================
+     Suodatinsirut
+     ========================================================================== */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+  .chip {
+    display: inline-flex; align-items: center;
+    height: 30px; padding: 0 12px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-dim);
+    border-radius: 999px;
+    font-size: 0.8rem; font-weight: 550;
+    cursor: pointer; user-select: none;
+    transition: background-color .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .chip:hover { color: var(--text); border-color: var(--border-strong); }
+  .chip.active { background: var(--chip-active-bg); color: var(--chip-active-text); border-color: var(--chip-active-bg); }
+
+  /* ==========================================================================
+     Kokoontaitettavat listaosiot (Työn alla, Tehdyt, Menneet...)
+     ========================================================================== */
+  details.past { margin-bottom: 6px; }
+  details.past summary {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; list-style: none; user-select: none;
+    color: var(--text-dim); font-size: 0.84rem; font-weight: 600;
+    padding: 8px 0; margin-bottom: 4px;
+    transition: color .15s;
+  }
+  details.past summary:hover { color: var(--text); }
+  details.past summary::-webkit-details-marker { display: none; }
+  details.past summary::before {
+    content: ""; width: 6px; height: 6px; flex-shrink: 0;
+    border-right: 1.75px solid currentColor; border-bottom: 1.75px solid currentColor;
+    transform: rotate(-45deg); margin: 0 3px 0 2px;
+    transition: transform .18s var(--ease);
+  }
+  details.past[open] summary::before { transform: rotate(45deg); margin-top: -3px; }
+  details.past[open] > .deadline-list, details.past[open] > .restore-list { margin-bottom: 16px; }
+  #upcomingList, #profileUpcomingList { margin: 4px 0 18px; }
+
+  /* ==========================================================================
+     Deadline-taulukko
+     Lista piirretään yhtenä korttina, jonka sisällä rivit erotetaan
+     ohuilla viivoilla. Rivin vasen reuna saa kurssin värin (inline).
+     ========================================================================== */
+  .deadline-list { display: flex; flex-direction: column; }
+  .deadline-list:has(> .deadline) {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .deadline-table-head, .deadline {
+    display: grid;
+    grid-template-columns: 104px minmax(200px, 1fr) 88px 176px 80px 108px 124px 60px;
+    column-gap: 12px;
+    align-items: center;
+  }
+  .deadline-table-head {
+    padding: 9px 16px 9px 13px;
+    border-left: 3px solid transparent;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.69rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-faint);
+  }
+  .sort-head-btn {
+    border: none; background: none; padding: 0; margin: 0;
+    font: inherit; font-size: inherit; font-weight: inherit; text-transform: inherit; letter-spacing: inherit;
+    color: inherit; cursor: pointer; white-space: nowrap;
+    transition: color .15s;
+  }
+  .sort-head-btn:hover { color: var(--text); }
+  .sort-head-btn.active { color: var(--accent); }
+
+  .deadline {
+    padding: 12px 16px 12px 13px;
+    background: var(--card-bg);
+    border-left: 3px solid var(--accent);
+    border-bottom: 1px solid var(--border);
+    transition: background-color .12s var(--ease);
+  }
+  .deadline:last-child { border-bottom: none; }
+  .deadline:hover { background: var(--bg-soft); }
+
+  .deadline select.status-select {
+    width: 100%;
+    height: 30px;
+    appearance: none; -webkit-appearance: none;
+    font: inherit; font-size: 0.78rem; font-weight: 600;
+    padding: 0 24px 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background-color: var(--card-bg);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 7px center;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .deadline select.status-select:hover { border-color: var(--border-strong); }
+  .deadline select.status-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+  .deadline.status-kesken select.status-select { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background-color: var(--accent-soft); }
+  .deadline.status-tehty select.status-select { color: var(--ok); }
+
+  .deadline .cell-title { min-width: 0; }
+  .deadline .title { font-weight: 600; display: block; line-height: 1.35; letter-spacing: -0.005em; }
+  .deadline a.title { color: inherit; text-decoration: none; }
+  .deadline a.title:hover { color: var(--accent); }
+  .deadline .course-tag { font-size: 0.75rem; color: var(--text-dim); display: block; font-weight: 500; margin-top: 1px; }
+  .deadline .notes { color: var(--text-dim); font-size: 0.79rem; margin-top: 4px; line-height: 1.5; }
+  .deadline .notes.notes-text { white-space: pre-line; }
+  .deadline .notes.notes-text.is-clamped {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .deadline .notes-toggle {
+    border: none; background: none; padding: 0; margin-top: 2px;
+    font-size: 0.75rem; font-weight: 600; color: var(--accent); cursor: pointer;
+  }
+  .deadline .notes-toggle:hover { text-decoration: underline; }
+  .deadline .exam-avail-note { font-style: italic; }
+  .deadline .exam-avail-full { color: var(--ok); }
+  .deadline .exam-avail-partial { color: var(--warn); }
+  .deadline .exam-avail-none { color: var(--text-dim); }
+
+  .deadline .type-badge, .deadline .date-badge {
+    justify-self: start;
+    display: inline-flex; align-items: center;
+    white-space: nowrap;
+    height: 22px; padding: 0 8px;
+    border-radius: var(--radius-xs);
+    font-size: 0.73rem; font-weight: 600;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .deadline .type-badge {
+    background: var(--card-bg); color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .deadline .type-badge.type-badge-examsys {
+    background: color-mix(in srgb, var(--accent-2) 12%, var(--card-bg));
+    border-color: color-mix(in srgb, var(--accent-2) 35%, transparent);
+    color: var(--accent-2);
+  }
+  .deadline .date-badge { background: var(--chip-bg); color: var(--text-dim); }
+  .deadline .date-badge.urgent { background: var(--danger-bg); color: var(--danger); }
+  .deadline .date-badge.soon { background: var(--warn-bg); color: var(--warn); }
+  .deadline .date-badge.ok { background: var(--ok-bg); color: var(--ok); }
+
+  .deadline .cell-hours, .deadline .cell-pace { display: flex; align-items: center; font-size: 0.78rem; color: var(--text-dim); }
+  .deadline .cell-value { display: flex; align-items: center; gap: 4px; }
+  .deadline .cell-hours input, .deadline .cell-pace input, .deadline .progress-input {
+    height: 28px; padding: 0 6px;
+    border: 1px solid var(--border); border-radius: var(--radius-xs);
+    background: var(--card-bg); color: var(--text);
+    font: inherit; font-size: 0.8rem; font-variant-numeric: tabular-nums;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .deadline .cell-hours input { width: 50px; }
+  .deadline .cell-pace input { width: 58px; }
+  .deadline .cell-hours input:hover, .deadline .cell-pace input:hover, .deadline .progress-input:hover { border-color: var(--border-strong); }
+  .deadline .cell-hours input:focus, .deadline .cell-pace input:focus, .deadline .progress-input:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none;
+  }
+  .deadline input.is-estimate { border-style: dashed; color: var(--text-dim); }
+  .deadline .progress-row { display: flex; align-items: center; gap: 6px; }
+  .deadline .progress-input { width: 56px; }
+  .deadline .cell-startby { font-size: 0.8rem; font-weight: 600; }
+  .deadline .cell-startby.overdue { color: var(--danger); }
+
+  .deadline .cell-actions { display: flex; justify-content: flex-end; gap: 2px; }
+  .deadline .delete-btn, .deadline .edit-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent;
+    color: var(--text-faint);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+  }
+  .deadline .delete-btn .icon, .deadline .edit-btn .icon { width: 15px; height: 15px; }
+  .deadline:hover .delete-btn, .deadline:hover .edit-btn { color: var(--text-dim); }
+  .deadline .delete-btn:hover { background: var(--danger-bg); color: var(--danger); }
+  .deadline .edit-btn:hover { background: var(--accent-soft); color: var(--accent); }
+
+  .deadline.status-tehty > *:not(.cell-actions):not(select) { opacity: 0.55; }
+  .deadline.status-tehty .title { text-decoration: line-through; text-decoration-color: var(--text-faint); }
+  .deadline.status-ei-tehda > *:not(.cell-actions):not(select) { opacity: 0.55; }
+  .deadline.status-ei-tehda .title { text-decoration: line-through; font-style: italic; text-decoration-color: var(--text-faint); }
+  .deadline.status-kesken { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card-bg)); }
+  .deadline.status-kesken:hover { background: var(--accent-soft); }
+
+  @media (max-width: 860px) {
+    .deadline-table-head { display: none; }
+    .deadline { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px 14px 13px; }
+    .deadline select.status-select { width: auto; align-self: flex-start; min-width: 120px; }
+    .deadline .cell-type, .deadline .cell-date, .deadline .cell-hours, .deadline .cell-pace, .deadline .cell-startby {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .deadline .cell-type::before { content: "Tyyppi"; }
+    .deadline .cell-date::before { content: "Määräaika"; }
+    .deadline .cell-hours::before { content: "Arvio"; }
+    .deadline .cell-pace::before { content: "Tahti"; }
+    .deadline .cell-startby::before { content: "Aloita viimeistään"; }
+    .deadline .cell-type::before, .deadline .cell-date::before, .deadline .cell-hours::before,
+    .deadline .cell-pace::before, .deadline .cell-startby::before {
+      color: var(--text-faint); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .deadline .type-badge, .deadline .date-badge { justify-self: end; }
+    .deadline .cell-actions { justify-content: flex-end; }
+  }
+
+  /* Poistetut / piilotetut -palautuslistat */
+  .restore-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .restore-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
+  .restore-item .restore-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .restore-item .title { font-weight: 600; font-size: 0.87rem; }
+  .restore-item .restore-meta { font-size: 0.75rem; color: var(--text-dim); }
+  .restore-item .restore-btn {
+    flex-shrink: 0; height: 30px; padding: 0 12px;
+    border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text);
+    border-radius: var(--radius-xs); font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    transition: background-color .15s, border-color .15s;
+  }
+  .restore-item .restore-btn:hover { background: var(--bg-soft); border-color: var(--text-faint); }
+
+  /* ==========================================================================
+     Lomakemodaali
+     ========================================================================== */
+  @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10, 12, 16, 0.5);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    animation: overlay-in .15s ease;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal-box {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    animation: modal-in .2s var(--ease);
+  }
+  .modal-box h3 { margin: 0 0 18px; font-size: 1.1rem; font-weight: 650; letter-spacing: -0.015em; }
+  .modal-box .field-label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 0.8rem; font-weight: 600; color: var(--text);
+    margin-bottom: 14px; flex: 1;
+  }
+  .modal-box .field-label input, .modal-box .field-label select, .modal-box .field-label textarea {
+    font: inherit; font-size: 0.88rem; font-weight: 400; color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg);
+    padding: 0 11px; width: 100%; height: 38px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .modal-box .field-label textarea { height: auto; padding: 9px 11px; resize: vertical; line-height: 1.5; }
+  .modal-box .field-label input:focus, .modal-box .field-label select:focus, .modal-box .field-label textarea:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none;
+  }
+  .modal-box .field-row { display: flex; gap: 12px; }
+  .modal-box .field-row[hidden] { display: none; }
+  .modal-box .field-row .field-label { min-width: 0; }
+  .modal-box .field-hint { font-size: 0.76rem; color: var(--text-dim); margin: -8px 0 14px; }
+  .modal-box select:disabled { opacity: 0.6; cursor: not-allowed; }
+  .modal-actions {
+    display: flex; align-items: center; gap: 8px;
+    margin: 20px -24px -24px; padding: 14px 24px;
+    border-top: 1px solid var(--border); background: var(--bg-soft);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+  .modal-actions-spacer { flex: 1; }
+  .modal-actions .link-btn {
+    border: none; background: none; box-shadow: none; color: var(--danger);
+    padding: 0 4px; height: auto; font-size: 0.8rem; font-weight: 600;
+  }
+  .modal-actions .link-btn:hover { background: none; text-decoration: underline; }
+
+  /* ==========================================================================
+     Kurssikortit
+     ========================================================================== */
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .course-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px 18px 16px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    overflow: hidden;
+    transition: box-shadow .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease);
+  }
+  .course-card::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--course-color, var(--accent));
+  }
+  .course-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); transform: translateY(-1px); }
+  .course-card .name { font-weight: 650; margin-bottom: 3px; letter-spacing: -0.01em; line-height: 1.35; }
+  .course-card .meta { color: var(--text-dim); font-size: 0.79rem; margin-bottom: 14px; font-weight: 500; }
+  .progress-track {
+    height: 6px; border-radius: 999px;
+    background: var(--chip-bg);
+    overflow: hidden; margin-bottom: 7px;
+  }
+  .progress-fill { height: 100%; background: var(--course-color, var(--accent)); border-radius: 999px; }
+  .progress-label { font-size: 0.75rem; color: var(--text-dim); display: flex; justify-content: space-between; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .course-card .links { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .course-card .links a { font-size: 0.79rem; color: var(--accent); text-decoration: none; font-weight: 600; }
+  .course-card .links a:hover { text-decoration: underline; }
+  .course-card .no-deadlines { margin-top: 10px; font-size: 0.78rem; color: var(--text-faint); }
+
+  .course-actions { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+  .course-action-btn {
+    height: 28px; padding: 0 10px;
+    border: 1px solid var(--border); background: var(--card-bg); color: var(--text-dim);
+    border-radius: var(--radius-xs); font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    transition: background-color .15s, color .15s, border-color .15s;
+  }
+  .course-action-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--bg-soft); }
+  .course-action-btn.course-action-danger:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); background: var(--danger-bg); }
+  .completed-courses-heading {
+    font-size: 0.84rem; color: var(--text-dim); margin: 28px 0 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .course-grid-completed .course-card { opacity: 0.6; filter: grayscale(0.5); box-shadow: none; }
+  .course-grid-completed .course-card:hover { opacity: 0.9; transform: none; box-shadow: var(--shadow-sm); }
+  .profile-course-actions { margin: 14px 0 0; }
+
+  .course-card .exam-badge, .needs-info-badge {
+    margin-top: 10px; display: inline-flex; align-items: center;
+    height: 22px; padding: 0 8px; border-radius: var(--radius-xs);
+    font-size: 0.73rem; font-weight: 600;
+  }
+  .course-card .exam-badge { background: var(--chip-bg); color: var(--text-dim); }
+  .course-card .exam-badge.overdue { background: var(--danger-bg); color: var(--danger); }
+  .course-card .exam-badge.exam-badge-open { background: var(--ok-bg); color: var(--ok); }
+  .course-card .exam-badge.exam-badge-closed { background: var(--chip-bg); color: var(--text-dim); }
+  .needs-info-badge { background: var(--warn-bg); color: var(--warn); height: auto; min-height: 22px; padding: 3px 8px; }
+  .profile-header .needs-info-badge { margin: 10px 0 0; }
+
+  /* ==========================================================================
+     Kurssin profiilisivu
+     ========================================================================== */
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-bottom: 16px;
+    color: var(--text-dim); text-decoration: none;
+    font-size: 0.84rem; font-weight: 550;
+    transition: color .15s;
+  }
+  .back-link:hover { color: var(--text); }
+  .profile-header {
+    position: relative; overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 26px 22px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow-sm);
+  }
+  .profile-header::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+    background: var(--course-color, var(--accent));
+  }
+  .profile-header .profile-name { font-size: 1.45rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .profile-header .profile-meta { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px; font-weight: 500; }
+  .profile-header .progress-track { margin-bottom: 7px; max-width: 520px; }
+  .profile-header .progress-label { max-width: 520px; }
+  .profile-header .links { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .profile-header .links a {
+    display: inline-flex; align-items: center; height: 30px; padding: 0 12px;
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--text); text-decoration: none;
+    border: 1px solid var(--border-strong); border-radius: var(--radius-xs);
+    background: var(--card-bg);
+    transition: background-color .15s, border-color .15s;
+  }
+  .profile-header .links a:hover { background: var(--bg-soft); border-color: var(--text-faint); }
+
+  .exam-widget {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: 18px 20px; margin: 18px 0 22px; box-shadow: var(--shadow-sm);
+  }
+  .exam-widget h3 { margin: 0 0 12px; font-size: 0.92rem; font-weight: 650; }
+  .exam-widget .exam-type-row { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; font-size: 0.85rem; }
+  .exam-widget .exam-type-row label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-weight: 500; }
+  .exam-widget .exam-type-row input[type="radio"] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  .exam-widget .exam-dates-row { display: flex; flex-wrap: wrap; gap: 18px; }
+  .exam-widget .exam-dates-row label { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+  .exam-widget input[type="date"] {
+    height: 34px; padding: 0 10px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    background: var(--card-bg); color: var(--text); font: inherit; font-size: 0.85rem;
+  }
+  .exam-widget input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+  .exam-widget .exam-hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 12px; line-height: 1.55; }
+  .exam-widget .exam-hint.overdue { color: var(--danger); font-weight: 600; }
+  .exam-widget input.is-estimate { border-style: dashed; color: var(--text-dim); }
+  .exam-widget .field-hint { font-size: 0.78rem; color: var(--text-dim); margin: -6px 0 10px; }
+
+  /* Kurssin sisältö (Moodle-aiheet) */
+  .topic-block { margin-bottom: 22px; }
+  .topic-block .topic-name { font-size: 0.88rem; font-weight: 650; margin: 0 0 10px; color: var(--text); }
+  .topic-items { display: flex; flex-direction: column; gap: 6px; }
+  .topic-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 0.85rem; font-weight: 500; color: var(--text); text-decoration: none;
+    padding: 9px 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--course-color, var(--accent));
+    border-radius: var(--radius-sm);
+    transition: background-color .15s, border-color .15s;
+  }
+  .topic-item:hover { background: var(--bg-soft); }
+  .topic-item .topic-item-type {
+    flex-shrink: 0;
+    font-size: 0.7rem; font-weight: 600; color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: var(--radius-xs);
+    padding: 2px 7px;
+  }
+  .topic-summary { font-size: 0.85rem; color: var(--text-dim); white-space: pre-wrap; margin: 0 0 12px; line-height: 1.6; }
+  .topic-item-content { border-radius: var(--radius-sm); overflow: hidden; }
+  .topic-item-content summary { list-style: none; cursor: pointer; }
+  .topic-item-content summary::-webkit-details-marker { display: none; }
+  .topic-item-content summary .topic-item { border-radius: var(--radius-sm); }
+  .topic-item-content[open] summary .topic-item { border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--bg-soft); }
+  .topic-item-content .topic-item-body {
+    font-size: 0.84rem; color: var(--text); white-space: pre-wrap; line-height: 1.65;
+    background: var(--card-bg);
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    padding: 14px 16px;
+  }
+  .topic-item-content .topic-item-body a { color: var(--accent); font-weight: 600; }
+  .topic-item-content .topic-item-body .open-in-moodle {
+    display: inline-block; margin-top: 10px;
+    font-size: 0.78rem; font-weight: 600; color: var(--accent); text-decoration: none;
+  }
+  .topic-item-content .topic-item-body .open-in-moodle:hover { text-decoration: underline; }
+
+  /* ==========================================================================
+     Kalenteri- ja viikkonäkymän otsikkorivi
+     ========================================================================== */
+  .calendar-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .calendar-header h2 {
+    order: -1; flex: 1; margin: 0; display: block;
+    font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em;
+  }
+  .calendar-header h2::first-letter, #calendarDayDetail h3::first-letter { text-transform: uppercase; }
+  .calendar-header button { padding: 0 12px; }
+  .calendar-header button.icon-btn { width: var(--control-h); padding: 0; }
+  .calendar-header button .icon { color: var(--text-dim); }
+
+  /* ==========================================================================
+     Kuukausikalenteri
+     ========================================================================== */
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); column-gap: 6px; margin-bottom: 28px; }
+  .calendar-hint { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 14px; line-height: 1.6; }
+  .calendar-weekday {
+    text-align: left; padding: 0 8px 8px;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-faint);
+  }
+  .calendar-week-block {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    column-gap: 6px; row-gap: 3px;
+    margin-bottom: 6px;
+  }
+  .calendar-day {
+    min-height: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    padding: 6px 7px;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px;
+    overflow: hidden;
+    transition: background-color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .calendar-day:has(.day-num.weekend) { background: var(--bg-soft); }
+  .calendar-day:hover { border-color: var(--border-strong); background: var(--bg-soft); }
+  .calendar-day.selected { border-color: var(--text-faint); box-shadow: inset 0 0 0 1px var(--text-faint); }
+  .calendar-day.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .calendar-day .day-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; padding: 0 4px; align-self: flex-start;
+    border-radius: 999px;
+    font-size: 0.78rem; font-weight: 600; color: var(--text);
+  }
+  .calendar-day .day-num.weekend { color: var(--text-dim); }
+  .calendar-day.today .day-num { background: var(--accent); color: #fff; }
+  .calendar-day .more { font-size: 0.66rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; }
+
+  /* Työskentelypalkit: sävytetty tausta + kurssin värinen alkureuna */
+  .calendar-bar {
+    position: relative; z-index: 1;
+    height: 19px; line-height: 19px;
+    margin: 0 1px;
+    padding: 0 7px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--bar-color, #3b82f6) 16%, var(--card-bg));
+    color: color-mix(in srgb, var(--bar-color, #3b82f6) 72%, var(--text));
+    box-shadow: inset 3px 0 0 var(--bar-color, #3b82f6);
+    font-size: 0.68rem; font-weight: 600;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: filter .15s;
+  }
+  .calendar-bar:hover { filter: brightness(0.96) saturate(1.2); }
+  .calendar-bar.bar-continues-start { border-top-left-radius: 0; border-bottom-left-radius: 0; box-shadow: none; margin-left: 0; }
+  .calendar-bar.bar-continues-end { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+  /* EXAM-ikkuna: koko varattava ajanjakso paperitentin/deadlinen sijaan.
+     Katkoviivareunainen ("open") osuus = jo varattavissa EXAM-järjestelmässä
+     juuri nyt; vinoviivoitettu ("closed") osuus = ei vielä varattavissa koska
+     EXAM-järjestelmä avaa aikoja vain n. 30 vrk etukäteen. */
+  .calendar-bar.bar-kind-examwin-open {
+    background: color-mix(in srgb, var(--bar-color, #3b82f6) 26%, var(--card-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, #3b82f6) 65%, transparent);
+    border: 1px dashed var(--bar-color, #3b82f6);
+    line-height: 17px;
+  }
+  .calendar-bar.bar-kind-examwin-closed {
+    background: repeating-linear-gradient(135deg,
+      color-mix(in srgb, var(--bar-color, #3b82f6) 16%, transparent) 0 4px,
+      transparent 4px 8px), var(--card-bg);
+    border: 1px dashed color-mix(in srgb, var(--bar-color, #3b82f6) 55%, transparent);
+    box-shadow: none;
+    color: var(--text-dim);
+    line-height: 17px;
+  }
+  /* Tehty/ei tehdä -tilat harmaannuttavat ja yliviivaavat palkin tyypistä
+     riippumatta — asetettu viimeisenä jotta voittaa kind-tyylit. */
+  .calendar-bar.bar-status-tehty { opacity: 0.45; filter: grayscale(0.8); text-decoration: line-through; }
+  .calendar-bar.bar-status-ei-tehda { opacity: 0.45; filter: grayscale(0.9); text-decoration: line-through; font-style: italic; }
+  /* "Työn alla" ei harmaannu (tehtävä on aktiivinen), vain korostettu reunus. */
+  .calendar-bar.bar-status-kesken { outline: 1.5px solid var(--accent-2); outline-offset: -1.5px; }
+
+  /* Päivälaatikon pienet sirut (kohteet ilman arvio+tahti -palkkia) */
+  .calendar-chip {
+    font-size: 0.66rem; font-weight: 600; line-height: 1.35;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--chip-color, #3b82f6) 16%, var(--card-bg));
+    color: color-mix(in srgb, var(--chip-color, #3b82f6) 72%, var(--text));
+    box-shadow: inset 2px 0 0 var(--chip-color, #3b82f6);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Sama tehty/ei tehdä -harmaannutus kuin palkeilla (bar-status-*), mutta
+     päivälaatikon pienelle sirulle. */
+  .calendar-chip.chip-status-tehty { opacity: 0.45; filter: grayscale(0.8); text-decoration: line-through; }
+  .calendar-chip.chip-status-ei-tehda { opacity: 0.45; filter: grayscale(0.9); text-decoration: line-through; font-style: italic; }
+  .calendar-chip.chip-status-kesken { outline: 1px solid var(--accent-2); outline-offset: -1px; }
+
+  /* Valitun päivän tiedot kalenterin alla */
+  #calendarDayDetail h3 { font-size: 1rem; font-weight: 650; margin: 0 0 12px; letter-spacing: -0.01em; }
+  #calendarDayDetail .inprogress-heading {
+    font-size: 0.72rem; font-weight: 600; color: var(--text-faint);
+    margin: 22px 0 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .inprogress-list { display: flex; flex-direction: column; gap: 6px; }
+  .inprogress-item {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--item-color, #3b82f6);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px; cursor: pointer; font-size: 0.85rem;
+    transition: background-color .15s, border-color .15s;
+  }
+  .inprogress-item:hover { background: var(--bg-soft); }
+  .inprogress-item .title { font-weight: 600; }
+  .inprogress-item a.title { color: inherit; text-decoration: none; }
+  .inprogress-item a.title:hover { color: var(--accent); }
+  .inprogress-item .course-tag { font-size: 0.74rem; color: var(--text-dim); font-weight: 500; }
+  .inprogress-item .meta { margin-left: auto; font-size: 0.76rem; color: var(--text-dim); text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .inprogress-item.status-tehty { opacity: 0.55; }
+  .inprogress-item.status-tehty .title { text-decoration: line-through; }
+  .inprogress-item.status-ei-tehda { opacity: 0.6; }
+  .inprogress-item.status-ei-tehda .title { text-decoration: line-through; font-style: italic; }
+  .inprogress-item.status-kesken { background: color-mix(in srgb, var(--accent-soft) 70%, var(--card-bg)); }
+
+  /* ==========================================================================
+     Viikkonäkymä
+     ========================================================================== */
+  .week-capacity-caption {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.72rem; font-weight: 600; color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 4px 0 8px;
+  }
+  .week-capacity-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px; }
+  .week-capacity-cell {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 5px 6px 5px 10px;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim);
+  }
+  .week-capacity-cell input {
+    width: 48px; height: 26px; padding: 0 4px;
+    border: 1px solid var(--border); border-radius: var(--radius-xs);
+    background: var(--bg-soft); color: var(--text);
+    font: inherit; font-size: 0.82rem; font-weight: 600; text-align: center; text-transform: none; letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .week-capacity-cell input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; background: var(--card-bg); }
+  .week-warning, .week-no-estimate {
+    border-radius: var(--radius-sm); padding: 11px 14px; margin-bottom: 14px;
+    font-size: 0.83rem; line-height: 1.6;
+    border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn);
+  }
+  .week-warning strong, .week-no-estimate strong { font-weight: 650; }
+  .week-no-estimate { background: var(--card-bg); border-color: var(--border); color: var(--text-dim); }
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .week-day-col {
+    min-height: 180px;
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--card-bg);
+    padding: 10px 8px 8px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .week-day-col.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .week-day-col.past { opacity: 0.55; background: var(--bg-soft); }
+  .week-day-col .week-day-head { font-size: 0.95rem; font-weight: 650; text-align: center; letter-spacing: -0.01em; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+  .week-day-col.today .week-day-head { color: var(--accent); }
+  .week-day-col .week-day-head .weekday-name { display: block; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); font-weight: 600; margin-bottom: 1px; }
+  .week-chip {
+    font-size: 0.72rem; font-weight: 600; line-height: 1.4;
+    padding: 6px 8px;
+    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--chip-color, #3b82f6) 14%, var(--card-bg));
+    color: color-mix(in srgb, var(--chip-color, #3b82f6) 70%, var(--text));
+    box-shadow: inset 3px 0 0 var(--chip-color, #3b82f6);
+    word-break: break-word;
+  }
+  .week-day-col .week-day-total {
+    margin-top: auto; padding-top: 6px;
+    font-size: 0.7rem; color: var(--text-dim); font-weight: 600; text-align: right;
+  }
+  .week-day-col .week-day-empty { font-size: 0.74rem; color: var(--text-faint); text-align: center; margin-top: 14px; }
+  .week-day-col.no-study {
+    background: repeating-linear-gradient(135deg, var(--bg-soft) 0 6px, var(--card-bg) 6px 12px);
+  }
+  .week-nostudy-toggle {
+    align-self: center; height: 22px; padding: 0 9px;
+    font-size: 0.66rem; font-weight: 600; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg); color: var(--text-dim); cursor: pointer;
+    transition: background-color .15s, color .15s, border-color .15s;
+  }
+  .week-nostudy-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+  .week-nostudy-toggle.active { background: var(--chip-active-bg); color: var(--chip-active-text); border-color: var(--chip-active-bg); }
+
+  /* ==========================================================================
+     Asetukset
+     ========================================================================== */
+  .settings-card {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+    margin: 0 0 18px; box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .settings-card-head { padding: 18px 22px 16px; border-bottom: 1px solid var(--border); }
+  .settings-card h3 { margin: 0; font-size: 0.98rem; font-weight: 650; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .settings-card .settings-optional-badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+    font-size: 0.66rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em;
+    border-radius: var(--radius-xs); background: var(--chip-bg); color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .settings-card .field-hint { font-size: 0.82rem; color: var(--text-dim); margin: 6px 0 0; line-height: 1.55; max-width: 760px; }
+  .settings-fields { padding: 0 22px; }
+  .settings-field {
+    display: grid; grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 6px 28px; align-items: start;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+  }
+  .settings-field:first-child { border-top: none; }
+  .settings-field-meta { padding-top: 7px; min-width: 0; }
+  .settings-field-meta label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text); cursor: pointer; }
+  .settings-field .field-sub-hint { font-size: 0.76rem; font-weight: 400; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+  .settings-field-control { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .settings-field-control input {
+    flex: 1; min-width: 0; height: 36px;
+    font: inherit; font-size: 0.88rem; color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg);
+    padding: 0 11px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .settings-field-control input::placeholder { color: var(--text-faint); }
+  .settings-field-control input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+  .settings-field-control input:disabled { opacity: 0.55; }
+  .settings-status-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-width: 190px; }
+  .settings-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 24px; padding: 0 9px; border-radius: 999px; white-space: nowrap;
+    font-size: 0.72rem; font-weight: 600;
+  }
+  .settings-status::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .settings-status.is-set { background: var(--ok-bg); color: var(--ok); }
+  .settings-status.is-unset { background: var(--chip-bg); color: var(--text-dim); }
+  .settings-status.pending-clear { background: var(--danger-bg); color: var(--danger); }
+  .settings-clear-btn {
+    border: none; background: none; color: var(--text-dim); font-size: 0.76rem; font-weight: 600;
+    cursor: pointer; padding: 4px 2px;
+  }
+  .settings-clear-btn:hover { color: var(--danger); text-decoration: underline; }
+  .settings-clear-btn[hidden] { display: none; }
+  .settings-actions {
+    display: flex; align-items: center; gap: 14px;
+    margin: 4px 0 30px; padding: 12px 16px;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .settings-actions button { height: 36px; padding: 0 18px; }
+  .settings-actions button:disabled { opacity: 0.6; cursor: progress; }
+  .settings-save-status { font-size: 0.84rem; color: var(--text-dim); }
+  .settings-save-status.ok { color: var(--ok); font-weight: 600; }
+  .settings-save-status.err { color: var(--danger); font-weight: 600; }
+
+  /* ==========================================================================
+     Alatunniste
+     ========================================================================== */
+  footer {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 20px;
+    color: var(--text-faint); font-size: 0.76rem;
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); line-height: 1.55;
+  }
+
+  /* ==========================================================================
+     Kapeat näytöt
+     ========================================================================== */
+  @media (max-width: 960px) {
+    .topbar-inner { flex-wrap: wrap; gap: 0 16px; padding: 10px 16px 0; }
+    .topbar-actions { order: 2; }
+    .view-nav {
+      order: 3; width: 100%;
+      margin: 8px -16px 0; padding: 0 16px 8px;
+      width: calc(100% + 32px);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .view-nav::-webkit-scrollbar { display: none; }
+  }
+  @media (max-width: 760px) {
+    .wrap { padding: 20px 16px 48px; }
+    .brand-text .sub { display: none; }
+    .sync-btn .btn-label { display: none; }
+    .view-nav a { padding: 0 10px; }
+    .view-nav a .icon { display: none; }
+    .summary-card .kpi-icon { display: none; }
+    .sync-btn { width: var(--control-h); padding: 0; }
+    .summary-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .summary-card { padding: 14px; }
+    .summary-card .num { font-size: 1.35rem; }
+    .calendar-header h2 { font-size: 1.15rem; }
+    .calendar-day { padding: 4px; }
+    .calendar-bar { font-size: 0.6rem; padding: 0 4px; }
+    .week-grid, .week-capacity-row { grid-template-columns: repeat(7, minmax(120px, 1fr)); overflow-x: auto; }
+    .settings-field { grid-template-columns: 1fr; }
+    .settings-field-meta { padding-top: 0; }
+    .settings-field-control { flex-wrap: wrap; }
+    .settings-status-wrap { min-width: 0; }
+    .settings-card-head, .settings-fields { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 9.5 12 4l10 5.5L12 15 2 9.5z"/><path d="M6 11.7V16c0 1.1 2.7 2.8 6 2.8s6-1.7 6-2.8v-4.3"/><path d="M22 9.5V15"/></svg></span>
+      <div class="brand-text">
+        <h1>Opintodashboard</h1>
+        <p class="sub" id="todayLine"></p>
+      </div>
+    </div>
+    <nav class="view-nav" id="viewNav" aria-label="Näkymät">
+      <a href="#" id="navDashboard"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Dashboard</span></a>
+      <a href="#kalenteri" id="navKalenteri"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Kalenteri</span></a>
+      <a href="#viikko" id="navViikko"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg><span>Viikko</span></a>
+      <a href="#asetukset" id="navAsetukset"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span>Asetukset</span></a>
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" class="sync-btn" id="syncMoodleBtn" title="Hae uudet kurssit ja tehtävät Moodlesta" aria-label="Hae uudet Moodlesta"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><span class="btn-label">Hae Moodlesta</span></button>
+      <button type="button" class="sync-btn" id="syncGoogleBtn" title="Vie deadlinet Google-kalenteriin ja Google Tasksiin" aria-label="Vie Google-kalenteriin"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M12 18v-5M9.5 15.5 12 13l2.5 2.5"/></svg><span class="btn-label">Vie Googleen</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="sync-statusbar" aria-live="polite">
+    <span class="sync-status" id="syncStatus"></span>
+    <span class="sync-status" id="syncGoogleStatus"></span>
+  </div>
+
+  <div id="dashboardView">
+    <div class="summary-row" id="summaryRow"></div>
+
+    <section>
+      <div class="section-head">
+        <h2>Deadlinet</h2>
+        <button type="button" class="add-task-btn" id="addTaskBtnDashboard"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Uusi tehtävä</button>
+      </div>
+      <div class="chips" id="typeChips"></div>
+      <details class="past" id="inProgressDetails" open>
+        <summary id="inProgressSummary">Työn alla</summary>
+        <div class="deadline-list" id="inProgressList"></div>
+      </details>
+      <div class="deadline-list" id="upcomingList"></div>
+      <details class="past" id="doneDetails">
+        <summary id="doneSummary">Tehdyt</summary>
+        <div class="deadline-list" id="doneList"></div>
+      </details>
+      <details class="past" id="notDoingDetails">
+        <summary id="notDoingSummary">Ei tehdä</summary>
+        <div class="deadline-list" id="notDoingList"></div>
+      </details>
+      <details class="past" id="pastDetails">
+        <summary id="pastSummary">Menneet</summary>
+        <div class="deadline-list" id="pastList"></div>
+      </details>
+      <details class="past" id="deletedDetails">
+        <summary id="deletedSummary">Poistetut</summary>
+        <div class="restore-list" id="deletedList"></div>
+      </details>
+    </section>
+
+    <section>
+      <h2>Kurssit</h2>
+      <p class="section-sub">Avaa kurssin oma sivu klikkaamalla korttia.</p>
+      <div class="course-grid" id="courseGrid"></div>
+
+      <div id="completedCoursesSection" hidden>
+        <h3 class="completed-courses-heading" id="completedCoursesHeading">Suoritetut kurssit</h3>
+        <div class="course-grid course-grid-completed" id="completedCourseGrid"></div>
+      </div>
+
+      <details class="past" id="hiddenCoursesDetails" hidden>
+        <summary id="hiddenCoursesSummary">Piilotetut kurssit</summary>
+        <div class="restore-list" id="hiddenCoursesList"></div>
+      </details>
+    </section>
+  </div>
+
+  <div id="calendarView" hidden>
+    <div class="calendar-header">
+      <button id="calPrev" type="button" class="icon-btn" title="Edellinen kuukausi" aria-label="Edellinen kuukausi"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <h2 id="calTitle"></h2>
+      <button id="calToday" type="button">Tänään</button>
+      <button id="calNext" type="button" class="icon-btn" title="Seuraava kuukausi" aria-label="Seuraava kuukausi"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <details class="info-note">
+      <summary><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Miten kalenteri toimii?</summary>
+      <div class="info-body">
+        <p>Palkit näyttävät arvioidun työskentelyjakson (aloitus &rarr; deadline) tuntiarvion ja tahdin perusteella. Klikkaa palkkia tai päivää nähdäksesi sen tiedot kalenterin alla.</p>
+        <p>EXAM-tenteillä on oma palkki koko varausikkunalle: katkoviivareunainen osuus on jo varattavissa EXAM-järjestelmässä, vinoviivoitettu osuus ei vielä (ajat avautuvat noin 30 vrk etukäteen).</p>
+        <p>Tehdyiksi tai "Ei tehdä" -merkityt kohteet näkyvät himmennettyinä ja yliviivattuina.</p>
+      </div>
+    </details>
+    <div class="calendar-grid" id="calendarGrid"></div>
+    <div id="calendarDayDetail"></div>
+  </div>
+
+  <div id="weekView" hidden>
+    <div class="calendar-header">
+      <button id="weekPrev" type="button" class="icon-btn" title="Edellinen viikko" aria-label="Edellinen viikko"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <h2 id="weekTitle"></h2>
+      <button id="weekToday" type="button">Tänään</button>
+      <button id="weekNext" type="button" class="icon-btn" title="Seuraava viikko" aria-label="Seuraava viikko"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <details class="info-note">
+      <summary><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Miten viikkosuunnitelma toimii?</summary>
+      <div class="info-body">
+        <p>Viikkonäkymä jakaa tehtävien Arvio-tunnit päiville: aikaisin deadline ensin, ja jokainen päivä täytetään sen opiskeluajan verran ennen kuin siirrytään seuraavaan tehtävään.</p>
+        <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Koko Arvio jaetaan aina, vaikka osa työstä olisi jo merkitty valmiiksi.</p>
+        <p>Jako lasketaan aina tästä päivästä eteenpäin, joten se pysyy samana riippumatta siitä, mitä viikkoa selaat. Myöhässä olevat tehtävät saavat tunteja ensimmäisinä.</p>
+        <p>Päivän "Ei opiskella" -painike nollaa kyseisen päivän opiskeluajan, esimerkiksi jos sinulla on muuta menoa.</p>
+      </div>
+    </details>
+    <div class="week-capacity-caption">Opiskeluaika päivässä (h)</div>
+    <div class="week-capacity-row" id="weekCapacityRow"></div>
+    <div class="week-warning" id="weekWarning" hidden></div>
+    <div class="week-no-estimate" id="weekNoEstimate" hidden></div>
+    <div class="week-grid" id="weekGrid"></div>
+  </div>
+
+  <div id="settingsView" hidden>
+    <div class="page-head">
+      <h2>Asetukset</h2>
+      <p>Kirjautumistiedot ja integraatiot. Täytä vain niiden palveluiden tiedot, joita käytät.</p>
+    </div>
+    <div class="callout">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <div>Arvot tallentuvat vain tämän koneen <code>.env</code>-tiedostoon, eivät koskaan git-repoon, ja ne lähetetään ainoastaan kyseiselle palvelulle (Moodle, Google tai DeepSeek). Tallennettuja arvoja ei turvallisuussyistä näytetä uudelleen: kentän vieressä näkyy vain, onko arvo asetettu. Uusi arvo korvaa vanhan, ja Tyhjennä poistaa sen.</div>
+    </div>
+    <div id="settingsOffline" class="callout callout-warn" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
+      <div>Asetuksia ei voi lukea eikä tallentaa juuri nyt. Tämä sivu toimii vain, kun dashboard on käynnistetty komennolla <code>node server.js</code> ja avattu osoitteesta http://localhost, ei suoraan tiedostona.</div>
+    </div>
+    <div id="settingsGroups"></div>
+    <div class="settings-actions">
+      <button type="button" id="settingsSaveBtn">Tallenna muutokset</button>
+      <span id="settingsSaveStatus" class="settings-save-status"></span>
+    </div>
+  </div>
+
+  <div id="profileView" hidden>
+    <a href="#" id="backLink" class="back-link"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg>Takaisin dashboardiin</a>
+    <div class="profile-header" id="profileHeader"></div>
+    <section>
+      <div class="section-head">
+        <h2>Deadlinet</h2>
+        <button type="button" class="add-task-btn" id="addTaskBtnProfile"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Uusi tehtävä</button>
+      </div>
+      <details class="past" id="profileInProgressDetails" open>
+        <summary id="profileInProgressSummary">Työn alla</summary>
+        <div class="deadline-list" id="profileInProgressList"></div>
+      </details>
+      <div class="deadline-list" id="profileUpcomingList"></div>
+      <details class="past" id="profileDoneDetails">
+        <summary id="profileDoneSummary">Tehdyt</summary>
+        <div class="deadline-list" id="profileDoneList"></div>
+      </details>
+      <details class="past" id="profileNotDoingDetails">
+        <summary id="profileNotDoingSummary">Ei tehdä</summary>
+        <div class="deadline-list" id="profileNotDoingList"></div>
+      </details>
+      <details class="past" id="profilePastDetails">
+        <summary id="profilePastSummary">Menneet</summary>
+        <div class="deadline-list" id="profilePastList"></div>
+      </details>
+    </section>
+    <section id="profileMaterialsSection" hidden>
+      <h2>Sisältö</h2>
+      <div id="profileMaterials"></div>
+    </section>
+  </div>
+
+  <div id="taskFormOverlay" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="taskFormHeading">Uusi tehtävä</h3>
+      <form id="taskForm">
+        <label class="field-label">Otsikko
+          <input type="text" id="taskFormTitle" required>
+        </label>
+        <label class="field-label">Kurssi
+          <select id="taskFormCourse"></select>
+        </label>
+        <p class="field-hint" id="taskFormCourseLock" hidden>
+          Kurssia ei voi vaihtaa Moodlesta skannatulle tehtävälle.
+        </p>
+        <div class="field-row">
+          <label class="field-label">Määräaika
+            <input type="date" id="taskFormDate" required>
+          </label>
+          <label class="field-label">Tyyppi
+            <select id="taskFormType"></select>
+          </label>
+        </div>
+        <label class="field-label">Muistiinpanot
+          <textarea id="taskFormNotes" rows="3"></textarea>
+        </label>
+        <div class="field-row" id="taskFormEstimateRow">
+          <label class="field-label">Arvio (h)
+            <input type="number" id="taskFormHours" min="0" step="0.5">
+          </label>
+          <label class="field-label">Tahti (h/vko)
+            <input type="number" id="taskFormPace" min="0.5" step="0.5">
+          </label>
+        </div>
+        <p class="field-hint" id="taskFormEstimateHint" hidden>
+          Arvio ja tahti muokataan suoraan deadline-rivin omista kentistä, ei täällä.
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="taskFormRevert" class="link-btn" hidden>Poista muokkaus</button>
+          <span class="modal-actions-spacer"></span>
+          <button type="button" id="taskFormCancel">Peruuta</button>
+          <button type="submit" id="taskFormSave">Tallenna</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    <span>Opintodashboard</span>
+    <span>Kurssidata tulee data.json-tiedostosta. Tilat, arviot ja EXAM-tiedot tallentuvat tämän selaimen muistiin eivätkä synkronoidu laitteiden välillä.</span>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  // Viivaikonit (inline-SVG) JS:n luomille painikkeille ja korteille.
+  const ICON_PATHS = {
+    "pencil": '<path d="M4 20h4L19 9a2.83 2.83 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+    "x": '<path d="M6 6l12 12M18 6 6 18"/>',
+    "book": '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>',
+    "award": '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4 7.5 21l4.5-2.6 4.5 2.6-1.1-7.6"/>',
+    "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    "flag": '<path d="M5 21V4"/><path d="M5 4h11l-2 4.5L16 13H5"/>',
+  };
+  function icon(name) {
+    return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON_PATHS[name] || "") + "</svg>";
+  }
+
+  const TYPE_LABELS = { task: "Tehtävä", exam: "Tentti", examsys: "EXAM", lab: "Labra", event: "Muu" };
+  // Monikkomuodot suodatinnapeille — ei johdettu TYPE_LABELS-arvosta
+  // pelkällä "+t"-liitteellä, koska se tuotti väärän muodon "Tenttit"
+  // (oikea monikko on "Tentit").
+  const TYPE_LABELS_PLURAL = { task: "Tehtävät", exam: "Tentit", examsys: "EXAM-tentit", lab: "Labrat", event: "Muut" };
+  const MATERIAL_TYPE_LABELS = {
+    resource: "tiedosto", folder: "kansio", url: "linkki", assign: "tehtävä",
+    quiz: "tentti", forum: "keskustelu", page: "sivu", label: "teksti", book: "kirja",
+    choice: "kysely", feedback: "palaute", lesson: "oppitunti", workshop: "työpaja",
+    wiki: "wiki", glossary: "sanasto", scorm: "scorm", h5pactivity: "h5p",
+    bigbluebuttonbn: "video", data: "tietokanta", survey: "kysely", chat: "chat",
+  };
+  const STORAGE_KEY = "opintodashboard_done_v1";
+  const STATUS_STORAGE_KEY = "opintodashboard_status_v1";
+  const PLAN_STORAGE_KEY = "opintodashboard_plan_v1";
+  const EXAM_STORAGE_KEY = "opintodashboard_exam_v1";
+  const CUSTOM_STORAGE_KEY = "opintodashboard_custom_v1";
+  const EDITS_STORAGE_KEY = "opintodashboard_edits_v1";
+  const PROGRESS_STORAGE_KEY = "opintodashboard_progress_v1";
+
+  // Kunkin deadlinen oma tila: "avoin" (oletus, ei tallenneta erikseen),
+  // "tehty", "ei-tehda" tai "poistettu". Korvaa vanhan tehty-ruksin
+  // (opintodashboard_done_v1), joka migroidaan tähän ensimmäisellä
+  // latauksella jos uutta tallennusta ei vielä ole.
+  function loadStatusMap() {
+    try {
+      const raw = localStorage.getItem(STATUS_STORAGE_KEY);
+      if (raw != null) return JSON.parse(raw);
+    } catch (e) { /* jatketaan migraatioon */ }
+    const migrated = {};
+    try {
+      const old = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      Object.keys(old).forEach((k) => { if (old[k]) migrated[k] = "tehty"; });
+    } catch (e) { /* ei vanhaa dataa, ei haittaa */ }
+    return migrated;
+  }
+  function saveStatusMap(map) {
+    try { localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let statusMap = loadStatusMap();
+
+  // Kunkin deadline-kohteen oma tuntimäärä-/tahtiarvio ("Arvio: X h", "Tahti:
+  // Y h/vko"), josta lasketaan "aloita viimeistään" -päivä suoraan selaimessa.
+  // Tallentuu vain tähän selaimeen, samaan tapaan kuin tehty-ruksit.
+  function loadPlanMap() {
+    try { return JSON.parse(localStorage.getItem(PLAN_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function savePlanMap(map) {
+    try { localStorage.setItem(PLAN_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let planMap = loadPlanMap();
+
+  // "Työn alla" -tilaisen kohteen oma valmiusprosentti (0-100), näkyy vain
+  // kun tila === "kesken". Tallentuu vain tähän selaimeen, samaan tapaan
+  // kuin muutkin tila-/arviotiedot.
+  function loadProgressMap() {
+    try { return JSON.parse(localStorage.getItem(PROGRESS_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveProgressMap(map) {
+    try { localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let progressMap = loadProgressMap();
+
+  // Viikkokalenterin päivittäinen opiskelukapasiteetti (tuntia/pv), oma
+  // arvo jokaiselle viikonpäivälle (ma..su), sama joka viikolle. Tallentuu
+  // vain tähän selaimeen, samaan tapaan kuin muutkin asetukset.
+  const CAPACITY_STORAGE_KEY = "opintodashboard_capacity_v1";
+  const DEFAULT_DAILY_CAPACITY = [2, 2, 2, 2, 2, 3, 3]; // ma..su, tuntia/pv
+  function loadCapacityMap() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CAPACITY_STORAGE_KEY) || "{}");
+      return DEFAULT_DAILY_CAPACITY.map((def, i) => (raw[i] != null ? raw[i] : def));
+    } catch (e) { return DEFAULT_DAILY_CAPACITY.slice(); }
+  }
+  function saveCapacityMap(arr) {
+    try { localStorage.setItem(CAPACITY_STORAGE_KEY, JSON.stringify(arr)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let capacityArr = loadCapacityMap();
+
+  // Päiväkohtainen "ei opiskella" -merkintä (esim. jokin muu menee sinä
+  // päivänä), erillinen viikonpäiväkohtaisesta kapasiteettipohjasta -
+  // ylikirjoittaa sen päivän kapasiteetin nollaksi vain kyseiselle päivälle.
+  // Tallennetaan joukkona ISO-päivämääriä, vain tähän selaimeen.
+  const NOSTUDY_STORAGE_KEY = "opintodashboard_nostudy_v1";
+  function loadNoStudySet() {
+    try { return new Set(JSON.parse(localStorage.getItem(NOSTUDY_STORAGE_KEY) || "[]")); }
+    catch (e) { return new Set(); }
+  }
+  function saveNoStudySet(set) {
+    try { localStorage.setItem(NOSTUDY_STORAGE_KEY, JSON.stringify(Array.from(set))); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let noStudySet = loadNoStudySet();
+
+  // Kurssikohtainen EXAM-tieto: onko tällä kurssilla itse varattava
+  // EXAM-tentti, Moodle-tentti, vai ei tenttiä ollenkaan, seka varaamisen
+  // deadline ja oma varattu paiva kun ne tiedetaan.
+  function loadExamMap() {
+    try { return JSON.parse(localStorage.getItem(EXAM_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveExamMap(map) {
+    try { localStorage.setItem(EXAM_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let examMap = loadExamMap();
+
+  // Itse lisätyt/luodut tehtävät (ei Moodlesta skannattuja). Jokaisella on
+  // pysyvä id, jotta nimen tai päivän muokkaaminen ei riko sen tila-/
+  // arviotietoja. Tallentuu vain tähän selaimeen.
+  function loadCustomItems() {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_STORAGE_KEY) || "[]"); }
+    catch (e) { return []; }
+  }
+  function saveCustomItems(list) {
+    try { localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(list)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let customItems = loadCustomItems();
+
+  // Käsin tehdyt muokkaukset Moodlesta skannattuihin kohteisiin (otsikko,
+  // päivä, tyyppi, muistiinpanot). Avaimena kohteen ALKUPERÄINEN itemKey
+  // (courseId+data.json:in oma päivä+otsikko), jotta muokkaus ei riko
+  // tila-/arviotietojen yhteyttä eikä katoa vaikka otsikkoa muutettaisiin.
+  // Tallentuu vain tähän selaimeen; data.json pysyy koskemattomana.
+  function loadEditsMap() {
+    try { return JSON.parse(localStorage.getItem(EDITS_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveEditsMap(map) {
+    try { localStorage.setItem(EDITS_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let editsMap = loadEditsMap();
+
+  // Kurssin oma tila: "active" (oletus, ei tallenneta erikseen), "completed"
+  // (merkitty suoritetuksi - näkyy vielä omassa harmaassa osiossaan) tai
+  // "hidden" (poistettu dashboardilta - esim. skannauksen löytämä roskakurssi
+  // kuten "Library Moodle"). Tallentuu vain tähän selaimeen; data.json ja
+  // sync_moodle.js pysyvät koskemattomina, joten Moodle-synkronointi ei riko
+  // eikä palauta näitä merkintöjä.
+  const COURSE_STATE_STORAGE_KEY = "opintodashboard_course_state_v1";
+  function loadCourseStateMap() {
+    try { return JSON.parse(localStorage.getItem(COURSE_STATE_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveCourseStateMap(map) {
+    try { localStorage.setItem(COURSE_STATE_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let courseStateMap = loadCourseStateMap();
+  function getCourseState(courseId) {
+    return courseStateMap[courseId] || "active";
+  }
+  function setCourseState(courseId, state) {
+    if (state === "active") delete courseStateMap[courseId];
+    else courseStateMap[courseId] = state;
+    saveCourseStateMap(courseStateMap);
+  }
+
+  // Itse luoduilla kohteilla on oma pysyvä id - käytetään sitä avaimena
+  // (eikä courseId+päivä+otsikko-yhdistelmää) jotta muokkaus ei riko
+  // tila-/arviotietoja. Moodle-kohteilla ei ole id:tä, joten ne käyttävät
+  // ennallaan alkuperäistä yhdistelmäavainta.
+  function itemKey(courseId, d) {
+    if (d.id) return "custom|" + d.id;
+    return courseId + "|" + d.date + "|" + d.title;
+  }
+
+  function getStatus(item) {
+    return statusMap[itemKey(item.courseId, item)] || "avoin";
+  }
+  function isVisible(item) {
+    return getStatus(item) !== "poistettu";
+  }
+  function isPending(item) {
+    return getStatus(item) === "avoin";
+  }
+
+  function parseDate(s) {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function startOfToday() {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }
+
+  function daysBetween(a, b) {
+    return Math.round((b - a) / 86400000);
+  }
+
+  function fmtDate(dt) {
+    return dt.toLocaleDateString("fi-FI", { weekday: "short", day: "numeric", month: "numeric" });
+  }
+
+  const today = startOfToday();
+
+  const courseById = {};
+  COURSES.forEach((c) => { courseById[c.id] = c; });
+
+  // Väri/nimi itse luoduille tehtäville joille ei valita kurssia.
+  const CUSTOM_NO_COURSE_COLOR = "#6b7280";
+
+  // Muodosta litteä lista kaikista deadlineista: ensin Moodlesta skannatut
+  // (data.json/data.js), sitten itse lisätyt omat tehtävät. Tämä on funktio
+  // eikä pelkkä kertaajo, koska omia tehtäviä voi lisätä/muokata kesken
+  // sivulatauksen (ks. taskForm-lomake) - silloin lista pitää rakentaa
+  // uudelleen jotta muutos näkyy heti.
+  let allItems = [];
+  function rebuildAllItems() {
+    allItems = [];
+    COURSES.forEach((course) => {
+      if (getCourseState(course.id) === "hidden") return;
+      (course.deadlines || []).forEach((d) => {
+        allItems.push({
+          courseId: course.id,
+          courseName: course.name,
+          color: course.color || "#3b82f6",
+          title: d.title,
+          date: d.date,
+          type: d.type || "event",
+          notes: d.notes || "",
+          estimatedHours: d.estimatedHours != null ? d.estimatedHours : null,
+          estimatedPace: d.estimatedPace != null ? d.estimatedPace : null,
+          examWindowStart: d.examWindowStart != null ? d.examWindowStart : null,
+          examWindowEnd: d.examWindowEnd != null ? d.examWindowEnd : null,
+        });
+      });
+    });
+    customItems.forEach((c) => {
+      const course = c.courseId ? courseById[c.courseId] : null;
+      allItems.push({
+        id: c.id,
+        courseId: course ? course.id : "oma",
+        courseName: course ? course.name : "Oma tehtävä",
+        color: course ? (course.color || "#3b82f6") : CUSTOM_NO_COURSE_COLOR,
+        title: c.title,
+        date: c.date,
+        type: c.type || "task",
+        notes: c.notes || "",
+        estimatedHours: c.estimatedHours != null ? c.estimatedHours : null,
+        estimatedPace: c.estimatedPace != null ? c.estimatedPace : null,
+        examWindowStart: null,
+        examWindowEnd: null,
+        isCustom: true,
+      });
+    });
+    allItems.sort((a, b) => a.date.localeCompare(b.date));
+    allItems.forEach((it) => {
+      if (it.type === "exam" && it.examWindowStart && it.examWindowEnd && getEffectiveExamChoice(it.courseId) === "exam-system") {
+        it.type = "examsys";
+      }
+    });
+  }
+  rebuildAllItems();
+
+  function getExamWindowInfo(courseId) {
+    const withWindow = allItems.find((it) => it.courseId === courseId && it.examWindowEnd);
+    return withWindow ? { start: withWindow.examWindowStart, end: withWindow.examWindowEnd } : null;
+  }
+
+  function getExamDefaultBookBy(courseId) {
+    const info = getExamWindowInfo(courseId);
+    return info ? info.end : null;
+  }
+
+  // Kurssin "todellinen" tenttivalinta: käyttäjän tallentama valinta jos
+  // sellainen on, muuten oletusarvo (EXAM-järjestelmä jos kurssilla on
+  // tiedossa EXAM-ikkuna, muuten ei mitään erityistä). Käytetään sekä
+  // Tentti-widgetissä että alla kohteiden EXAM-kategorisoinnissa, jotta
+  // molemmat pysyvät aina yhteneväisinä.
+  function getEffectiveExamChoice(courseId) {
+    const info = examMap[courseId] || {};
+    const defaultBookBy = getExamDefaultBookBy(courseId);
+    return info.type || (defaultBookBy ? "exam-system" : null);
+  }
+
+  // EXAM-järjestelmässä ajan voi varata vain n. EXAM_BOOKING_HORIZON_DAYS
+  // vuorokautta etukäteen, joten vaikka koko ikkuna olisi tiedossa, kaikki
+  // sen ajat eivät välttämättä näy järjestelmässä vielä. Tämä kertoo onko
+  // ikkuna jo kokonaan varattavissa, osittain, vai ei lainkaan.
+  const EXAM_BOOKING_HORIZON_DAYS = 30;
+  function getExamAvailability(courseId, deadlineIso) {
+    const info = getExamWindowInfo(courseId);
+    const windowStart = parseDate((info && info.start) || deadlineIso);
+    const deadlineDate = parseDate(deadlineIso);
+    const bookableUntil = new Date(today.getTime() + EXAM_BOOKING_HORIZON_DAYS * 86400000);
+    if (bookableUntil >= deadlineDate) {
+      return {
+        status: "full",
+        text:
+          "EXAM-järjestelmässä pitäisi jo näkyä aikoja koko ikkunan loppuun asti (ajan voi varata " +
+          EXAM_BOOKING_HORIZON_DAYS + " vrk etukäteen).",
+      };
+    }
+    if (bookableUntil >= windowStart) {
+      return {
+        status: "partial",
+        text:
+          "EXAM-järjestelmässä näkyy tällä hetkellä aikoja suunnilleen " + fmtDate(bookableUntil) +
+          " asti (ajan voi varata vain " + EXAM_BOOKING_HORIZON_DAYS +
+          " vrk etukäteen) — myöhemmät ajat ilmestyvät sitä mukaa kun ehdit lähemmäs.",
+      };
+    }
+    const opensInDays = Math.max(0, daysBetween(today, new Date(windowStart.getTime() - EXAM_BOOKING_HORIZON_DAYS * 86400000)));
+    return {
+      status: "none",
+      text:
+        "Ajanvaraus ei ole vielä auennut EXAM-järjestelmässä (ajan voi varata vain " +
+        EXAM_BOOKING_HORIZON_DAYS + " vrk etukäteen) — avautunee noin " + opensInDays + " pv päästä.",
+    };
+  }
+
+  // Jos kurssilla on seka paperi-/luokkatentti etta vaihtoehtoinen
+  // EXAM-ikkuna (examWindowEnd asetettu deadline-datassa), ja EXAM-aika on
+  // varattu kurssin Tentti-widgetissa, oletetaan etta EXAM korvaa
+  // paperitentin kokonaan - paperitenttia ei oletettavasti tehda. Silloin
+  // deadline-listalla nakyy alkuperaisen luokkatenttipaivan sijaan varattu
+  // EXAM-paiva.
+  function getExamOverride(item) {
+    if (!item.examWindowEnd) return null;
+    const info = examMap[item.courseId] || {};
+    if (info.type === "exam-system" && info.examDate) {
+      return {
+        date: info.examDate,
+        title: item.title + " — EXAM varattu",
+        notes:
+          "EXAM varattu " + fmtDate(parseDate(info.examDate)) + ". Paperitenttiä ei oletettavasti tehdä." +
+          (item.notes ? " " + item.notes : ""),
+      };
+    }
+    return null;
+  }
+  // Käsin tehty muokkaus (ks. loadEditsMap) - itse luoduilla kohteilla ei
+  // ole erillistä muokkauskerrosta koska niiden kenttiä muutetaan suoraan
+  // (ks. customItems).
+  function getUserEdit(item) {
+    if (item.isCustom) return null;
+    return editsMap[itemKey(item.courseId, item)] || null;
+  }
+  function effDate(item) {
+    const edit = getUserEdit(item);
+    if (edit && edit.date) return edit.date;
+    const ov = getExamOverride(item);
+    return ov ? ov.date : item.date;
+  }
+  function displayTitle(item) {
+    const edit = getUserEdit(item);
+    if (edit && edit.title) return edit.title;
+    const ov = getExamOverride(item);
+    return ov ? ov.title : item.title;
+  }
+  function displayNotes(item) {
+    const edit = getUserEdit(item);
+    if (edit && edit.notes != null) return edit.notes;
+    const ov = getExamOverride(item);
+    return ov ? ov.notes : item.notes;
+  }
+  function displayType(item) {
+    const edit = getUserEdit(item);
+    return (edit && edit.type) || item.type;
+  }
+
+  // Suora linkki kurssin Moodle-etusivulle, jos moodleId on tiedossa.
+  // Ei (vielä) linkkiä suoraan yksittäiseen tehtävään Moodlessa, koska se
+  // vaatisi jokaisen kohteen oman Moodle-aktiviteetti-ID:n (cmid) tallennuksen
+  // dataan — kurssin etusivu on käytännöllinen korvike siihen asti.
+  function getCourseMoodleUrl(courseId) {
+    const course = courseById[courseId];
+    if (!course || !course.moodleId) return null;
+    return "https://moodle5.samk.fi/course/view.php?id=" + course.moodleId;
+  }
+
+  let activeTypes = new Set(Object.keys(TYPE_LABELS));
+
+  // Deadline-listan sarakelajittelu ("Määräaika"/"Aloita viimeistään" -otsikot
+  // ovat klikattavia). null = oletusjärjestys (tulevat lähimmästä alkaen,
+  // menneet tuoreimmasta taaksepäin). Sama tila koskee kaikkia listoja jotka
+  // käyttävät appendDeadlineRows/createDeadlineHeader-pariskuntaa (dashboard,
+  // kurssin profiilisivu), jotta valinta pysyy yhtenäisenä sivun sisällä.
+  let sortKey = null; // "date" | "startby" | null
+  let sortDir = 1; // 1 = nouseva, -1 = laskeva
+
+  // Kunkin kohteen oma tuntimäärä-/tahtiarvio (planMap-tallennus tai
+  // data.json:in oma oletusarvio), sama logiikka jolla deadline-rivin oma
+  // "Aloita viimeistään" -solu lasketaan (ks. renderDeadlineItem/updateStartBy)
+  // - eriytetty tänne jotta sama arvo on käytettävissä myös lajittelussa
+  // ilman että riviä tarvitsee ensin piirtää.
+  function getPlanHoursPace(item) {
+    const key = itemKey(item.courseId, item);
+    const plan = planMap[key] || {};
+    const hours = plan.hours != null ? plan.hours : item.estimatedHours;
+    const pace = plan.pace != null ? plan.pace : item.estimatedPace;
+    return { hours, pace };
+  }
+  function computeStartByDate(item) {
+    const { hours, pace } = getPlanHoursPace(item);
+    if (!hours || !pace) return null;
+    const dt = parseDate(effDate(item));
+    const weeksNeeded = hours / pace;
+    return new Date(dt.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+  }
+
+  function compareBySortKey(key, dir) {
+    return (a, b) => {
+      let av, bv;
+      if (key === "startby") {
+        const ad = computeStartByDate(a);
+        const bd = computeStartByDate(b);
+        av = ad ? ad.getTime() : null;
+        bv = bd ? bd.getTime() : null;
+      } else {
+        av = effDate(a);
+        bv = effDate(b);
+      }
+      // Kohteet joilla ei ole arvio+tahti-tietoa (siis ei "aloita viimeistään"
+      // -päivää) menevät aina listan loppuun kummassakin suunnassa, etteivät
+      // ne hyppää sekavasti kärkeen laskevassa järjestyksessä.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (av < bv) return dir === 1 ? -1 : 1;
+      if (av > bv) return dir === 1 ? 1 : -1;
+      return 0;
+    };
+  }
+
+  // Palauttaa lajitellun kopion: käyttäjän valitsema sarakelajittelu jos
+  // sellainen on asetettu, muuten oletusjärjestys (tulevat lähimmästä
+  // alkaen / menneet tuoreimmasta taaksepäin).
+  function applyDeadlineSort(items, isPast) {
+    const list = items.slice();
+    if (sortKey) {
+      list.sort(compareBySortKey(sortKey, sortDir));
+    } else {
+      list.sort((a, b) => effDate(a).localeCompare(effDate(b)));
+      if (isPast) list.reverse();
+    }
+    return list;
+  }
+
+  function toIsoDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function getItemsByDate() {
+    const map = {};
+    allItems.forEach((it) => {
+      if (!isVisible(it)) return;
+      const d = effDate(it);
+      (map[d] = map[d] || []).push(it);
+    });
+    return map;
+  }
+
+  const WEEKDAYS_FI = ["Ma", "Ti", "Ke", "To", "Pe", "La", "Su"];
+  let calMonthOffset = 0;
+  let selectedDate = toIsoDate(today);
+
+  // Viikkokalenteri (#viikko): erillinen näkymä joka jakaa "Työn alla" tai
+  // jo myöhässä olevien (aloita viimeistään <= tänään) tehtävien Arvio-
+  // tuntimäärän päiville ahneesti (aikaisin deadline ensin, täytetään
+  // päivän jäljellä oleva kapasiteetti ennen seuraavaan tehtävään
+  // siirtymistä). Allokointi lasketaan aina tästä päivästä eteenpäin (ei
+  // riipu selatusta viikosta), jotta se pysyy samana riippumatta
+  // navigoinnista - Edellinen/Seuraava vain ikkunoi valmiiksi lasketun
+  // allokoinnin oikealle viikolle.
+  let weekOffset = 0;
+
+  function getWeekMonday(offset) {
+    const jsDay = today.getDay(); // 0 = su ... 6 = la
+    const mondayDelta = jsDay === 0 ? -6 : 1 - jsDay;
+    const thisMonday = new Date(today.getTime() + mondayDelta * 86400000);
+    return new Date(thisMonday.getTime() + offset * 7 * 86400000);
+  }
+
+  function fmtShort(dt) {
+    return dt.toLocaleDateString("fi-FI", { day: "numeric", month: "numeric" });
+  }
+
+  const WEEK_HORIZON_DAYS = 60;
+
+  // Palauttaa {perDay, overflow, noEstimate}: perDay on {isoPäivä: [{item,
+  // hours}]}, overflow on tehtävät joiden koko Arviota ei saatu mahdutettua
+  // ennen niiden omaa määräaikaa (nykyisellä kapasiteetilla), noEstimate on
+  // aikataulutettavat tehtävät joilta puuttuu Arvio eikä niitä siksi voida
+  // aikatauluttaa lainkaan. "Tehty"/"Ei tehdä" -tehtävät jätetään aina pois,
+  // ja koko Arvio jaetaan riippumatta valmiusprosentista.
+  function computeWeekAllocation() {
+    const qualifying = allItems.filter((it) => {
+      if (!isVisible(it)) return false;
+      const status = getStatus(it);
+      if (status === "tehty" || status === "ei-tehda") return false;
+      if (status === "kesken") return true;
+      const startBy = computeStartByDate(it);
+      return !!startBy && daysBetween(today, startBy) <= 0;
+    });
+    // Käytetään samaa "Arvio"-arvon ratkaisua kuin muuallakin sovelluksessa
+    // (ks. getPlanHoursPace/computeStartByDate): joko rivin oma inline-kentän
+    // arvo (planMap) tai data.json:in/Moodlen/DeepSeekin alkuperäinen arvio -
+    // pelkkä item.estimatedHours jättäisi huomiotta käsin syötetyt arviot.
+    const noEstimate = qualifying.filter((it) => {
+      const hours = getPlanHoursPace(it).hours;
+      return hours == null || hours <= 0;
+    });
+    const schedulable = qualifying
+      .filter((it) => {
+        const hours = getPlanHoursPace(it).hours;
+        return hours != null && hours > 0;
+      })
+      .map((it) => ({ item: it, remaining: getPlanHoursPace(it).hours, deadline: parseDate(effDate(it)) }))
+      .sort((a, b) => effDate(a.item).localeCompare(effDate(b.item)) || a.item.title.localeCompare(b.item.title));
+
+    const perDay = {};
+    for (let offset = 0; offset < WEEK_HORIZON_DAYS; offset++) {
+      const day = new Date(today.getTime() + offset * 86400000);
+      const iso = toIsoDate(day);
+      const wd = (day.getDay() + 6) % 7; // ma=0 ... su=6
+      let capLeft = noStudySet.has(iso) ? 0 : (capacityArr[wd] || 0);
+      for (const task of schedulable) {
+        if (capLeft <= 0) break;
+        if (task.remaining <= 0) continue;
+        // Deadline-rajaa ei sovelleta jos deadline on jo mennyt - silloin
+        // tehtävä on jo myöhässä eikä sitä silti jätetä aikatauluttamatta,
+        // vaan se saa tunteja normaalisti (korkealla prioriteetilla, koska
+        // sen deadline on kaikkein aikaisin lajittelujärjestyksessä). Jos
+        // tätä rajaa sovellettaisiin myös menneisiin deadlineihin, JOKAINEN
+        // tuleva päivä olisi "deadlinen jälkeen" eikä tehtävä saisi koskaan
+        // yhtään tuntia - täsmälleen se bugi joka löytyi 2026-09-24.
+        if (task.deadline >= today && day > task.deadline) continue;
+        const alloc = Math.min(capLeft, task.remaining);
+        if (alloc <= 0) continue;
+        (perDay[iso] = perDay[iso] || []).push({ item: task.item, hours: alloc });
+        task.remaining -= alloc;
+        capLeft -= alloc;
+      }
+    }
+    const overflow = schedulable
+      .filter((t) => t.remaining > 0.001)
+      .map((t) => ({ item: t.item, missingHours: t.remaining }));
+    return { perDay, overflow, noEstimate };
+  }
+
+  // Suodatinnapit toimivat "näytä vain tämä tyyppi" -periaatteella: oletus on
+  // "Kaikki" näkyvissä, ja tyyppinapin klikkaus näyttää PELKÄSTÄÄN sen
+  // tyypin (ei siis piilota sitä muiden joukosta, kuten aiemmin). Saman
+  // napin klikkaus uudestaan palauttaa "Kaikki"-tilan.
+  function renderChips() {
+    const wrap = document.getElementById("typeChips");
+    wrap.innerHTML = "";
+    const allTypesCount = Object.keys(TYPE_LABELS).length;
+    const allActive = activeTypes.size === allTypesCount;
+
+    const allChip = document.createElement("span");
+    allChip.className = "chip" + (allActive ? " active" : "");
+    allChip.textContent = "Kaikki";
+    allChip.onclick = () => { activeTypes = new Set(Object.keys(TYPE_LABELS)); refresh(); };
+    wrap.appendChild(allChip);
+
+    Object.keys(TYPE_LABELS).forEach((key) => {
+      const isOnlyThis = !allActive && activeTypes.size === 1 && activeTypes.has(key);
+      const chip = document.createElement("span");
+      chip.className = "chip" + (isOnlyThis ? " active" : "");
+      chip.textContent = TYPE_LABELS_PLURAL[key] || TYPE_LABELS[key];
+      chip.onclick = () => {
+        activeTypes = isOnlyThis ? new Set(Object.keys(TYPE_LABELS)) : new Set([key]);
+        refresh();
+      };
+      wrap.appendChild(chip);
+    });
+  }
+
+  function urgencyClass(diffDays) {
+    if (diffDays < 0) return "";
+    if (diffDays <= 3) return "urgent";
+    if (diffDays <= 7) return "soon";
+    return "ok";
+  }
+
+  function urgencyText(diffDays) {
+    if (diffDays === 0) return "tänään";
+    if (diffDays === 1) return "huomenna";
+    if (diffDays === -1) return "eilen";
+    if (diffDays < 0) return Math.abs(diffDays) + " pv sitten";
+    return diffDays + " pv päästä";
+  }
+
+  const SORTABLE_HEAD_COLUMNS = { "Määräaika": "date", "Aloita viimeistään": "startby" };
+
+  function createDeadlineHeader() {
+    const head = document.createElement("div");
+    head.className = "deadline-table-head";
+    ["Tila", "Tehtävä", "Tyyppi", "Määräaika", "Arvio", "Tahti", "Aloita viimeistään", ""].forEach((label) => {
+      const cell = document.createElement("div");
+      const colKey = SORTABLE_HEAD_COLUMNS[label];
+      if (colKey) {
+        const isActive = sortKey === colKey;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sort-head-btn" + (isActive ? " active" : "");
+        btn.textContent = label + (isActive ? (sortDir === 1 ? " ▲" : " ▼") : "");
+        btn.title = isActive
+          ? "Vaihda lajittelusuuntaa (kolmas klikkaus palauttaa oletusjärjestyksen)"
+          : "Lajittele tämän sarakkeen mukaan";
+        btn.onclick = () => {
+          if (sortKey === colKey) {
+            if (sortDir === 1) sortDir = -1;
+            else { sortKey = null; sortDir = 1; }
+          } else {
+            sortKey = colKey;
+            sortDir = 1;
+          }
+          refresh();
+        };
+        cell.appendChild(btn);
+      } else {
+        cell.textContent = label;
+      }
+      head.appendChild(cell);
+    });
+    return head;
+  }
+
+  function appendDeadlineRows(container, items) {
+    if (items.length) container.appendChild(createDeadlineHeader());
+    items.forEach((it) => container.appendChild(renderDeadlineItem(it)));
+  }
+
+  function renderDeadlineItem(item) {
+    const dt = parseDate(effDate(item));
+    const diff = daysBetween(today, dt);
+    const key = itemKey(item.courseId, item);
+    const status = getStatus(item);
+
+    const row = document.createElement("div");
+    row.className = "deadline" + (status !== "avoin" ? " status-" + status : "");
+    row.style.borderLeftColor = item.color;
+
+    const statusSelect = document.createElement("select");
+    statusSelect.className = "status-select";
+    [["avoin", "Avoin"], ["kesken", "Työn alla"], ["tehty", "Tehty"], ["ei-tehda", "Ei tehdä"]].forEach(([val, label]) => {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label;
+      statusSelect.appendChild(opt);
+    });
+    statusSelect.value = status === "poistettu" ? "avoin" : status;
+    statusSelect.onchange = () => {
+      if (statusSelect.value === "avoin") delete statusMap[key];
+      else statusMap[key] = statusSelect.value;
+      saveStatusMap(statusMap);
+      refresh();
+    };
+    row.appendChild(statusSelect);
+
+    const titleCell = document.createElement("div");
+    titleCell.className = "cell-title";
+    const moodleUrl = getCourseMoodleUrl(item.courseId);
+    const title = document.createElement(moodleUrl ? "a" : "span");
+    title.className = "title";
+    title.textContent = displayTitle(item);
+    if (moodleUrl) {
+      title.href = moodleUrl;
+      title.target = "_blank";
+      title.rel = "noopener";
+      title.title = "Avaa " + item.courseName + " Moodlessa (kurssin etusivu — ei suoraa linkkiä tehtävään)";
+      title.onclick = (e) => e.stopPropagation();
+    }
+    titleCell.appendChild(title);
+    const tag = document.createElement("span");
+    tag.className = "course-tag";
+    tag.textContent = item.courseName;
+    titleCell.appendChild(tag);
+    const notesText = displayNotes(item);
+    if (notesText) {
+      const notes = document.createElement("div");
+      notes.className = "notes notes-text";
+      notes.textContent = notesText;
+      titleCell.appendChild(notes);
+      // Pitkät Moodle-kuvaukset tiivistetään kahdelle riville, jotta
+      // taulukon rivit pysyvät matalina; "Näytä lisää" avaa koko tekstin.
+      if (notesText.length > 140 || notesText.split("\n").length > 2) {
+        notes.classList.add("is-clamped");
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "notes-toggle";
+        more.textContent = "Näytä lisää";
+        more.onclick = (e) => {
+          e.stopPropagation();
+          const clamped = notes.classList.toggle("is-clamped");
+          more.textContent = clamped ? "Näytä lisää" : "Näytä vähemmän";
+        };
+        titleCell.appendChild(more);
+      }
+    }
+    if (status === "kesken") {
+      const progressRow = document.createElement("div");
+      progressRow.className = "notes progress-row";
+      progressRow.appendChild(document.createTextNode("Valmiina: "));
+      const progressInput = document.createElement("input");
+      progressInput.type = "number";
+      progressInput.className = "progress-input";
+      progressInput.min = "0";
+      progressInput.max = "100";
+      progressInput.step = "5";
+      progressInput.value = progressMap[key] != null ? progressMap[key] : 0;
+      progressInput.title = "Kuinka monta prosenttia tästä tehtävästä on tehty";
+      progressInput.onclick = (e) => e.stopPropagation();
+      progressInput.onchange = () => {
+        let v = parseInt(progressInput.value, 10);
+        if (!Number.isFinite(v)) v = 0;
+        v = Math.max(0, Math.min(100, v));
+        progressInput.value = v;
+        progressMap[key] = v;
+        saveProgressMap(progressMap);
+      };
+      progressRow.appendChild(progressInput);
+      progressRow.appendChild(document.createTextNode(" %"));
+      titleCell.appendChild(progressRow);
+    }
+    if (item.examWindowStart && item.examWindowEnd && !getExamOverride(item)) {
+      const avail = getExamAvailability(item.courseId, item.examWindowEnd);
+      const availNote = document.createElement("div");
+      availNote.className = "notes exam-avail-note exam-avail-" + avail.status;
+      availNote.textContent = avail.text;
+      titleCell.appendChild(availNote);
+    }
+    row.appendChild(titleCell);
+
+    const typeCell = document.createElement("div");
+    typeCell.className = "cell-type";
+    const typeBadge = document.createElement("span");
+    typeBadge.className = "type-badge" + (displayType(item) === "examsys" ? " type-badge-examsys" : "");
+    typeBadge.textContent = TYPE_LABELS[displayType(item)] || displayType(item);
+    typeCell.appendChild(typeBadge);
+    row.appendChild(typeCell);
+
+    const dateCell = document.createElement("div");
+    dateCell.className = "cell-date";
+    const badge = document.createElement("span");
+    badge.className = "date-badge " + (diff >= 0 ? urgencyClass(diff) : "");
+    badge.textContent = fmtDate(dt) + " (" + urgencyText(diff) + ")";
+    dateCell.appendChild(badge);
+    row.appendChild(dateCell);
+
+    const plan = planMap[key] || {};
+
+    const hoursCell = document.createElement("div");
+    hoursCell.className = "cell-hours";
+    const hoursInput = document.createElement("input");
+    hoursInput.type = "number";
+    hoursInput.min = "0";
+    hoursInput.step = "0.5";
+    hoursInput.placeholder = "–";
+    const usingDefaultHours = plan.hours == null && item.estimatedHours != null;
+    hoursInput.title = usingDefaultHours
+      ? "Arvioitu kokonaistuntimäärä — tämä on oma arvioni, muokkaa vapaasti"
+      : "Arvioitu kokonaistuntimäärä";
+    if (plan.hours != null) hoursInput.value = plan.hours;
+    else if (item.estimatedHours != null) hoursInput.value = item.estimatedHours;
+    if (usingDefaultHours) hoursInput.classList.add("is-estimate");
+    const hoursValueWrap = document.createElement("span");
+    hoursValueWrap.className = "cell-value";
+    hoursValueWrap.appendChild(hoursInput);
+    hoursValueWrap.appendChild(document.createTextNode("h"));
+    hoursCell.appendChild(hoursValueWrap);
+    row.appendChild(hoursCell);
+
+    const paceCell = document.createElement("div");
+    paceCell.className = "cell-pace";
+    const paceInput = document.createElement("input");
+    paceInput.type = "number";
+    paceInput.min = "0.5";
+    paceInput.step = "0.5";
+    paceInput.placeholder = "–";
+    const usingDefaultPace = plan.pace == null && item.estimatedPace != null;
+    paceInput.title = usingDefaultPace
+      ? "Oletettu viikkotahti — tämä on oma arvioni, muokkaa vapaasti"
+      : "Oletettu viikkotahti";
+    if (plan.pace != null) paceInput.value = plan.pace;
+    else if (item.estimatedPace != null) paceInput.value = item.estimatedPace;
+    if (usingDefaultPace) paceInput.classList.add("is-estimate");
+    const paceValueWrap = document.createElement("span");
+    paceValueWrap.className = "cell-value";
+    paceValueWrap.appendChild(paceInput);
+    paceValueWrap.appendChild(document.createTextNode("h/vko"));
+    paceCell.appendChild(paceValueWrap);
+    row.appendChild(paceCell);
+
+    const startByCell = document.createElement("div");
+    startByCell.className = "cell-startby";
+    row.appendChild(startByCell);
+
+    function updateStartBy() {
+      const hours = parseFloat(hoursInput.value);
+      const pace = parseFloat(paceInput.value);
+      if (!hours || !pace) {
+        startByCell.textContent = "";
+        startByCell.classList.remove("overdue");
+        return;
+      }
+      const weeksNeeded = hours / pace;
+      const startDate = new Date(dt.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+      // Ei näytetä "(myöhässä)"-leimaa jos tehtävä on jo merkitty "Työn alla"
+      // tai "Tehty" -tilaan - työn ollessa kesken tai valmiina "myöhässä" ei
+      // ole enää oikea/motivoiva kuvaus, vaikka laskennallinen aloituspäivä
+      // olisikin jo mennyt.
+      const overdue = daysBetween(today, startDate) < 0 && status !== "kesken" && status !== "tehty";
+      startByCell.textContent = fmtDate(startDate) + (overdue ? " (myöhässä)" : "");
+      startByCell.classList.toggle("overdue", overdue);
+    }
+
+    function savePlan() {
+      const hoursVal = hoursInput.value ? parseFloat(hoursInput.value) : null;
+      const paceVal = paceInput.value ? parseFloat(paceInput.value) : null;
+      if (hoursVal == null && paceVal == null) delete planMap[key];
+      else planMap[key] = { hours: hoursVal, pace: paceVal };
+      savePlanMap(planMap);
+      updateStartBy();
+    }
+
+    // Refresh siirretään setTimeoutilla seuraavaan tickiin: jos rivin
+    // tunti/tahti-kenttää muokataan ja heti perään klikataan saman rivin
+    // muokkaa/poista-nappia, selain ehtii vielä lähettää click-eventin
+    // vanhalle napille ennen kuin refresh() ehtii piirtää koko listan
+    // uudelleen (muuten nappi katoaa DOM:ista kesken klikkauksen eikä
+    // klikkaus rekisteröidy).
+    hoursInput.onchange = () => { hoursInput.classList.remove("is-estimate"); savePlan(); setTimeout(refresh, 0); };
+    paceInput.onchange = () => { paceInput.classList.remove("is-estimate"); savePlan(); setTimeout(refresh, 0); };
+    updateStartBy();
+
+    const actionsCell = document.createElement("div");
+    actionsCell.className = "cell-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "edit-btn";
+    editBtn.innerHTML = icon("pencil");
+    editBtn.title = item.isCustom ? "Muokkaa omaa tehtävää" : "Muokkaa (otsikko, päivä, tyyppi, muistiinpanot)";
+    editBtn.setAttribute("aria-label", "Muokkaa \"" + displayTitle(item) + "\"");
+    editBtn.onclick = () => openTaskForm({ mode: "edit", item });
+    actionsCell.appendChild(editBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "delete-btn";
+    deleteBtn.innerHTML = icon("x");
+    deleteBtn.title = "Poista listalta";
+    deleteBtn.setAttribute("aria-label", "Poista \"" + item.title + "\" listalta");
+    deleteBtn.onclick = () => {
+      if (confirm("Poistetaanko \"" + item.title + "\" listalta? Löydät sen tarvittaessa Poistetut-osiosta.")) {
+        statusMap[key] = "poistettu";
+        saveStatusMap(statusMap);
+        refresh();
+      }
+    };
+    actionsCell.appendChild(deleteBtn);
+
+    row.appendChild(actionsCell);
+
+    return row;
+  }
+
+  function renderRestoreItem(item) {
+    const key = itemKey(item.courseId, item);
+    const row = document.createElement("div");
+    row.className = "restore-item";
+
+    const info = document.createElement("div");
+    info.className = "restore-info";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = item.title;
+    info.appendChild(title);
+    const meta = document.createElement("span");
+    meta.className = "restore-meta";
+    meta.textContent = item.courseName + " · " + fmtDate(parseDate(item.date));
+    info.appendChild(meta);
+    row.appendChild(info);
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "restore-btn";
+    restoreBtn.textContent = "Palauta";
+    restoreBtn.onclick = () => {
+      delete statusMap[key];
+      saveStatusMap(statusMap);
+      refresh();
+    };
+    row.appendChild(restoreBtn);
+
+    return row;
+  }
+
+  function renderLists() {
+    const upcomingWrap = document.getElementById("upcomingList");
+    const inProgressWrap = document.getElementById("inProgressList");
+    const doneWrap = document.getElementById("doneList");
+    const notDoingWrap = document.getElementById("notDoingList");
+    const pastWrap = document.getElementById("pastList");
+    upcomingWrap.innerHTML = "";
+    inProgressWrap.innerHTML = "";
+    doneWrap.innerHTML = "";
+    notDoingWrap.innerHTML = "";
+    pastWrap.innerHTML = "";
+
+    const filtered = allItems.filter((it) => activeTypes.has(it.type) && isVisible(it));
+    // Ei vielä mennyt (määräaika >= tänään) jaetaan omaan osioonsa tilan
+    // mukaan, jotta "Työn alla"/"Tehty"/"Ei tehdä" -merkityt eivät sotke
+    // avointen tehtävien listaa. Mennyt (< tänään) näkyy silti aina
+    // "Menneet"-osiossa tilasta riippumatta, kuten ennenkin.
+    const notYetPast = filtered.filter((it) => daysBetween(today, parseDate(effDate(it))) >= 0);
+    const upcoming = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "avoin"), false);
+    const inProgress = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "kesken"), false);
+    const done = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "tehty"), false);
+    const notDoing = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "ei-tehda"), false);
+    const past = applyDeadlineSort(filtered.filter((it) => daysBetween(today, parseDate(effDate(it))) < 0), true);
+
+    if (upcoming.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "Ei tulevia deadlineja tällä suodattimella.";
+      upcomingWrap.appendChild(empty);
+    } else {
+      appendDeadlineRows(upcomingWrap, upcoming);
+    }
+
+    document.getElementById("inProgressSummary").textContent = "Työn alla (" + inProgress.length + ")";
+    appendDeadlineRows(inProgressWrap, inProgress);
+
+    document.getElementById("doneSummary").textContent = "Tehdyt (" + done.length + ")";
+    appendDeadlineRows(doneWrap, done);
+
+    document.getElementById("notDoingSummary").textContent = "Ei tehdä (" + notDoing.length + ")";
+    appendDeadlineRows(notDoingWrap, notDoing);
+
+    document.getElementById("pastSummary").textContent = "Menneet (" + past.length + ")";
+    appendDeadlineRows(pastWrap, past);
+
+    const deleted = allItems.filter((it) => getStatus(it) === "poistettu");
+    document.getElementById("deletedSummary").textContent = "Poistetut (" + deleted.length + ")";
+    const deletedWrap = document.getElementById("deletedList");
+    deletedWrap.innerHTML = "";
+    deleted.forEach((it) => deletedWrap.appendChild(renderRestoreItem(it)));
+  }
+
+  function renderSummary() {
+    const wrap = document.getElementById("summaryRow");
+    wrap.innerHTML = "";
+
+    const visibleCourses = COURSES.filter((c) => getCourseState(c.id) !== "hidden");
+    const activeCourseCount = visibleCourses.filter((c) => getCourseState(c.id) !== "completed").length;
+    const totalCredits = visibleCourses.reduce((s, c) => s + (c.credits || 0), 0);
+    const upcomingNotDone = allItems
+      .filter((it) => {
+        const diff = daysBetween(today, parseDate(effDate(it)));
+        return diff >= 0 && isPending(it);
+      })
+      .sort((a, b) => effDate(a).localeCompare(effDate(b)));
+    const next14 = upcomingNotDone.filter((it) => daysBetween(today, parseDate(effDate(it))) <= 14);
+    const nextItem = upcomingNotDone[0];
+
+    const cards = [
+      { title: "Kurssit", icon: "book", num: activeCourseCount, label: "käynnissä nyt" },
+      { title: "Opintopisteet", icon: "award", num: totalCredits + " op", label: "yhteensä tällä kaudella" },
+      { title: "Seuraavat 14 päivää", icon: "clock", num: next14.length, label: next14.length === 1 ? "avoin deadline" : "avointa deadlinea" },
+      {
+        title: "Seuraava deadline",
+        icon: "flag",
+        num: nextItem ? urgencyText(daysBetween(today, parseDate(effDate(nextItem)))) : "-",
+        label: nextItem ? displayTitle(nextItem) : "Ei tulevia deadlineja",
+      },
+    ];
+
+    cards.forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "summary-card";
+      const head = document.createElement("div");
+      head.className = "kpi-head";
+      const title = document.createElement("span");
+      title.className = "kpi-title";
+      title.textContent = c.title;
+      const ic = document.createElement("span");
+      ic.className = "kpi-icon";
+      ic.innerHTML = icon(c.icon);
+      head.appendChild(title);
+      head.appendChild(ic);
+      const num = document.createElement("div");
+      num.className = "num";
+      num.textContent = c.num;
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = c.label;
+      label.title = c.label;
+      card.appendChild(head);
+      card.appendChild(num);
+      card.appendChild(label);
+      wrap.appendChild(card);
+    });
+  }
+
+  function buildCourseCard(course, isCompleted) {
+      // Moodlesta automaattisesti löydetyillä uusilla kursseilla (ks.
+      // sync_moodle.js) ei ole vielä alkamis-/päättymispäiviä eikä
+      // opintopisteitä/opettajaa - niitä ei voi laskea etenemispalkkiin,
+      // joten näytetään sen sijaan huomautus että tiedot pitää täydentää.
+      const hasSchedule = !!(course.start && course.end);
+      let start, end, totalSpan, elapsed, pct, status;
+      if (hasSchedule) {
+        start = parseDate(course.start);
+        end = parseDate(course.end);
+        totalSpan = Math.max(1, daysBetween(start, end));
+        elapsed = Math.min(totalSpan, Math.max(0, daysBetween(start, today)));
+        pct = Math.round((elapsed / totalSpan) * 100);
+        status = today < start ? "Ei alkanut" : today > end ? "Päättynyt" : pct + "% kulunut";
+      }
+
+      const card = document.createElement("div");
+      card.className = "course-card";
+      card.style.setProperty("--course-color", course.color || "#3b82f6");
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = course.name;
+      card.appendChild(name);
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const metaBits = [];
+      if (course.code) metaBits.push(course.code);
+      metaBits.push((course.credits != null ? course.credits : "?") + " op");
+      if (course.teacher) metaBits.push(course.teacher);
+      meta.textContent = metaBits.join(" · ");
+      card.appendChild(meta);
+
+      if (hasSchedule) {
+        const track = document.createElement("div");
+        track.className = "progress-track";
+        const fill = document.createElement("div");
+        fill.className = "progress-fill";
+        fill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+        track.appendChild(fill);
+        card.appendChild(track);
+
+        const progLabel = document.createElement("div");
+        progLabel.className = "progress-label";
+        progLabel.innerHTML = "<span>" + status + "</span><span>" + course.start.slice(5) + " – " + course.end.slice(5) + "</span>";
+        card.appendChild(progLabel);
+      }
+
+      if (course.needsInfo) {
+        const needsInfoBadge = document.createElement("div");
+        needsInfoBadge.className = "needs-info-badge";
+        needsInfoBadge.textContent = "⚠ Täydennä tiedot (op / opettaja / alkamis-päättymispäivät)";
+        card.appendChild(needsInfoBadge);
+      }
+
+      const dlCount = allItems.filter((it) => it.courseId === course.id && isVisible(it)).length;
+      if (dlCount === 0) {
+        const note = document.createElement("div");
+        note.className = "no-deadlines";
+        note.textContent = "Ei vielä deadline-tietoja";
+        card.appendChild(note);
+      }
+
+      const savedExam = examMap[course.id];
+      const defaultBookBy = getExamDefaultBookBy(course.id);
+      const examInfo = savedExam && savedExam.type ? savedExam : (defaultBookBy ? { type: "exam-system", bookBy: defaultBookBy } : null);
+      if (examInfo && examInfo.type === "exam-system" && !examInfo.examDate) {
+        const badge = document.createElement("div");
+        badge.className = "exam-badge";
+        if (examInfo.bookBy) {
+          const bookByDate = parseDate(examInfo.bookBy);
+          const diff = daysBetween(today, bookByDate);
+          badge.textContent = "EXAM: suoritettava viim. " + fmtDate(bookByDate);
+          const avail = getExamAvailability(course.id, examInfo.bookBy);
+          if (avail.status === "none") badge.textContent += " (ei vielä auki)";
+          else if (avail.status === "partial") badge.textContent += " (osittain auki)";
+          if (diff < 3) badge.classList.add("overdue");
+          else if (avail.status === "none") badge.classList.add("exam-badge-closed");
+          else badge.classList.add("exam-badge-open");
+        } else {
+          badge.textContent = "EXAM: määräpäivä puuttuu";
+          badge.classList.add("overdue");
+        }
+        card.appendChild(badge);
+      } else if (examInfo && examInfo.type === "exam-system" && examInfo.examDate) {
+        const badge = document.createElement("div");
+        badge.className = "exam-badge";
+        badge.textContent = "EXAM varattu: " + fmtDate(parseDate(examInfo.examDate));
+        card.appendChild(badge);
+      }
+
+      if (course.links && course.links.length) {
+        const linksWrap = document.createElement("div");
+        linksWrap.className = "links";
+        course.links.forEach((l) => {
+          const a = document.createElement("a");
+          a.href = l.url;
+          a.textContent = l.label;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.onclick = (e) => e.stopPropagation();
+          linksWrap.appendChild(a);
+        });
+        card.appendChild(linksWrap);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "course-actions";
+
+      const completeBtn = document.createElement("button");
+      completeBtn.type = "button";
+      completeBtn.className = "course-action-btn";
+      completeBtn.textContent = isCompleted ? "Palauta aktiiviseksi" : "Merkitse suoritetuksi";
+      completeBtn.title = isCompleted
+        ? "Palauta kurssi aktiivisten kurssien listalle"
+        : "Merkitse kurssi suoritetuksi (siirtyy omaan osioonsa)";
+      completeBtn.onclick = (e) => {
+        e.stopPropagation();
+        setCourseState(course.id, isCompleted ? "active" : "completed");
+        refresh();
+      };
+      actions.appendChild(completeBtn);
+
+      const hideBtn = document.createElement("button");
+      hideBtn.type = "button";
+      hideBtn.className = "course-action-btn course-action-danger";
+      hideBtn.textContent = "Poista";
+      hideBtn.title = "Piilota kurssi dashboardilta (löytyy myöhemmin \"Piilotetut kurssit\" -osiosta)";
+      hideBtn.onclick = (e) => {
+        e.stopPropagation();
+        setCourseState(course.id, "hidden");
+        refresh();
+      };
+      actions.appendChild(hideBtn);
+
+      card.appendChild(actions);
+
+      card.onclick = () => { location.hash = "#kurssi/" + encodeURIComponent(course.id); };
+
+      return card;
+  }
+
+  function renderHiddenCourseRestoreItem(course) {
+    const row = document.createElement("div");
+    row.className = "restore-item";
+
+    const info = document.createElement("div");
+    info.className = "restore-info";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = course.name;
+    info.appendChild(title);
+    row.appendChild(info);
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "restore-btn";
+    restoreBtn.textContent = "Palauta";
+    restoreBtn.onclick = () => {
+      setCourseState(course.id, "active");
+      refresh();
+    };
+    row.appendChild(restoreBtn);
+
+    return row;
+  }
+
+  function renderCourses() {
+    const wrap = document.getElementById("courseGrid");
+    const completedWrap = document.getElementById("completedCourseGrid");
+    wrap.innerHTML = "";
+    completedWrap.innerHTML = "";
+
+    const activeCourses = [];
+    const completedCourses = [];
+    const hiddenCourses = [];
+    COURSES.forEach((course) => {
+      const state = getCourseState(course.id);
+      if (state === "hidden") hiddenCourses.push(course);
+      else if (state === "completed") completedCourses.push(course);
+      else activeCourses.push(course);
+    });
+
+    activeCourses.forEach((course) => wrap.appendChild(buildCourseCard(course, false)));
+    completedCourses.forEach((course) => completedWrap.appendChild(buildCourseCard(course, true)));
+
+    document.getElementById("completedCoursesSection").hidden = completedCourses.length === 0;
+    document.getElementById("completedCoursesHeading").textContent = "Suoritetut kurssit (" + completedCourses.length + ")";
+
+    const hiddenWrap = document.getElementById("hiddenCoursesList");
+    hiddenWrap.innerHTML = "";
+    hiddenCourses.forEach((course) => hiddenWrap.appendChild(renderHiddenCourseRestoreItem(course)));
+    document.getElementById("hiddenCoursesDetails").hidden = hiddenCourses.length === 0;
+    document.getElementById("hiddenCoursesSummary").textContent = "Piilotetut kurssit (" + hiddenCourses.length + ")";
+  }
+
+  function renderExamWidget(course) {
+    const info = examMap[course.id] || {};
+    const defaultBookBy = getExamDefaultBookBy(course.id);
+    const effectiveType = getEffectiveExamChoice(course.id);
+    const usingDefaultType = !info.type && !!defaultBookBy;
+
+    const wrap = document.createElement("div");
+    wrap.className = "exam-widget";
+
+    const h = document.createElement("h3");
+    h.textContent = "Tentti";
+    wrap.appendChild(h);
+
+    const typeRow = document.createElement("div");
+    typeRow.className = "exam-type-row";
+    const EXAM_TYPES = [
+      { value: "exam-system", label: "EXAM-järjestelmä (pitää varata itse)" },
+      { value: "moodle", label: "Moodle-tentti" },
+      { value: "none", label: "Ei tenttiä" },
+    ];
+    EXAM_TYPES.forEach((t) => {
+      const label = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "examtype-" + course.id;
+      radio.value = t.value;
+      radio.checked = effectiveType === t.value;
+      radio.onchange = () => {
+        examMap[course.id] = Object.assign({}, examMap[course.id], { type: t.value });
+        saveExamMap(examMap);
+        refresh();
+      };
+      label.appendChild(radio);
+      label.appendChild(document.createTextNode(" " + t.label));
+      typeRow.appendChild(label);
+    });
+    wrap.appendChild(typeRow);
+
+    if (usingDefaultType) {
+      const typeHint = document.createElement("div");
+      typeHint.className = "field-hint";
+      typeHint.textContent =
+        "Tällä kurssilla on tiedossa EXAM-ikkuna, joten tämä on esivalittu — muokkaa vapaasti jos tilanne on toinen.";
+      wrap.appendChild(typeHint);
+    }
+
+    if (effectiveType === "exam-system") {
+      const datesRow = document.createElement("div");
+      datesRow.className = "exam-dates-row";
+
+      const bookByLabel = document.createElement("label");
+      bookByLabel.appendChild(document.createTextNode("Suoritettava viimeistään"));
+      const bookByInput = document.createElement("input");
+      bookByInput.type = "date";
+      const usingDefaultBookBy = info.bookBy == null && defaultBookBy != null;
+      if (info.bookBy != null) bookByInput.value = info.bookBy;
+      else if (defaultBookBy) bookByInput.value = defaultBookBy;
+      if (usingDefaultBookBy) bookByInput.classList.add("is-estimate");
+      bookByInput.title = usingDefaultBookBy
+        ? "EXAM-ikkunan sulkeutumispäivä — tämä on oma arvioni, muokkaa vapaasti"
+        : "";
+      bookByInput.onchange = () => {
+        bookByInput.classList.remove("is-estimate");
+        examMap[course.id] = Object.assign({}, examMap[course.id], {
+          type: (examMap[course.id] && examMap[course.id].type) || effectiveType,
+          bookBy: bookByInput.value || null,
+        });
+        saveExamMap(examMap);
+        refresh();
+      };
+      bookByLabel.appendChild(bookByInput);
+      datesRow.appendChild(bookByLabel);
+
+      const examDateLabel = document.createElement("label");
+      examDateLabel.appendChild(document.createTextNode("Varattu EXAM-päivä"));
+      const examDateInput = document.createElement("input");
+      examDateInput.type = "date";
+      if (info.examDate) examDateInput.value = info.examDate;
+      examDateInput.onchange = () => {
+        examMap[course.id] = Object.assign({}, examMap[course.id], {
+          type: (examMap[course.id] && examMap[course.id].type) || effectiveType,
+          examDate: examDateInput.value || null,
+        });
+        saveExamMap(examMap);
+        refresh();
+      };
+      examDateLabel.appendChild(examDateInput);
+      datesRow.appendChild(examDateLabel);
+
+      wrap.appendChild(datesRow);
+
+      const hint = document.createElement("div");
+      hint.className = "exam-hint";
+      const effectiveBookBy = info.bookBy != null ? info.bookBy : defaultBookBy;
+      if (info.examDate) {
+        const examD = parseDate(info.examDate);
+        const diff = daysBetween(today, examD);
+        hint.textContent =
+          "Oma EXAM-aika varattu: " + fmtDate(examD) + " (" + urgencyText(diff) + "). " +
+          "Tämä korvaa listalla mahdollisen paperitentin päivämäärän — paperitenttiä ei oletettavasti tehdä.";
+      } else if (effectiveBookBy) {
+        const bookByDate = parseDate(effectiveBookBy);
+        const diff = daysBetween(today, bookByDate);
+        if (diff < 0) {
+          hint.textContent = "Määräpäivä on jo mennyt etkä ole vielä merkinnyt varattua päivää — tarkista EXAM-järjestelmästä.";
+          hint.classList.add("overdue");
+        } else {
+          const avail = getExamAvailability(course.id, effectiveBookBy);
+          hint.textContent = "Tentti suoritettava viimeistään " + fmtDate(bookByDate) + " (" + urgencyText(diff) + "). " + avail.text;
+        }
+      } else {
+        hint.textContent = "Aseta yllä milloin tentti pitää viimeistään olla suoritettu, kun tiedät sen.";
+      }
+      wrap.appendChild(hint);
+    }
+
+    return wrap;
+  }
+
+  function renderProfile(course) {
+    const hasSchedule = !!(course.start && course.end);
+    let start, end, totalSpan, elapsed, pct, status;
+    if (hasSchedule) {
+      start = parseDate(course.start);
+      end = parseDate(course.end);
+      totalSpan = Math.max(1, daysBetween(start, end));
+      elapsed = Math.min(totalSpan, Math.max(0, daysBetween(start, today)));
+      pct = Math.round((elapsed / totalSpan) * 100);
+      status = today < start ? "Ei alkanut" : today > end ? "Päättynyt" : pct + "% kulunut";
+    }
+
+    const header = document.getElementById("profileHeader");
+    header.innerHTML = "";
+    header.style.setProperty("--course-color", course.color || "#3b82f6");
+
+    const name = document.createElement("h1");
+    name.className = "profile-name";
+    name.textContent = course.name;
+    header.appendChild(name);
+
+    const metaBits = [];
+    if (course.code) metaBits.push(course.code);
+    metaBits.push((course.credits != null ? course.credits : "?") + " op");
+    if (course.teacher) metaBits.push(course.teacher);
+    const meta = document.createElement("div");
+    meta.className = "profile-meta";
+    meta.textContent = metaBits.join(" · ");
+    header.appendChild(meta);
+
+    if (hasSchedule) {
+      const track = document.createElement("div");
+      track.className = "progress-track";
+      const fill = document.createElement("div");
+      fill.className = "progress-fill";
+      fill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+      track.appendChild(fill);
+      header.appendChild(track);
+
+      const progLabel = document.createElement("div");
+      progLabel.className = "progress-label";
+      progLabel.innerHTML = "<span>" + status + "</span><span>" + course.start + " – " + course.end + "</span>";
+      header.appendChild(progLabel);
+    }
+
+    if (course.needsInfo) {
+      const needsInfoBadge = document.createElement("div");
+      needsInfoBadge.className = "needs-info-badge";
+      needsInfoBadge.textContent = "⚠ Tiedot puutteelliset - täydennä op/opettaja/alkamis-päättymispäivät data.json:iin";
+      header.appendChild(needsInfoBadge);
+    }
+
+    if (course.links && course.links.length) {
+      const linksWrap = document.createElement("div");
+      linksWrap.className = "links";
+      course.links.forEach((l) => {
+        const a = document.createElement("a");
+        a.href = l.url;
+        a.textContent = l.label;
+        a.target = "_blank";
+        a.rel = "noopener";
+        linksWrap.appendChild(a);
+      });
+      header.appendChild(linksWrap);
+    }
+
+    const profileState = getCourseState(course.id);
+    const profileActions = document.createElement("div");
+    profileActions.className = "course-actions profile-course-actions";
+
+    const profileCompleteBtn = document.createElement("button");
+    profileCompleteBtn.type = "button";
+    profileCompleteBtn.className = "course-action-btn";
+    profileCompleteBtn.textContent = profileState === "completed" ? "Merkitse aktiiviseksi" : "Merkitse suoritetuksi";
+    profileCompleteBtn.onclick = () => {
+      setCourseState(course.id, profileState === "completed" ? "active" : "completed");
+      refresh();
+    };
+    profileActions.appendChild(profileCompleteBtn);
+
+    const profileHideBtn = document.createElement("button");
+    profileHideBtn.type = "button";
+    profileHideBtn.className = "course-action-btn course-action-danger";
+    profileHideBtn.textContent = profileState === "hidden" ? "Palauta näkyviin" : "Piilota kurssi";
+    profileHideBtn.onclick = () => {
+      const goingHidden = profileState !== "hidden";
+      setCourseState(course.id, goingHidden ? "hidden" : "active");
+      if (goingHidden) location.hash = "";
+      refresh();
+    };
+    profileActions.appendChild(profileHideBtn);
+
+    header.appendChild(profileActions);
+
+    header.appendChild(renderExamWidget(course));
+
+    document.getElementById("addTaskBtnProfile").onclick = () => openTaskForm({ mode: "create", courseId: course.id });
+
+    const upcomingWrap = document.getElementById("profileUpcomingList");
+    const inProgressWrap = document.getElementById("profileInProgressList");
+    const doneWrap = document.getElementById("profileDoneList");
+    const notDoingWrap = document.getElementById("profileNotDoingList");
+    const pastWrap = document.getElementById("profilePastList");
+    upcomingWrap.innerHTML = "";
+    inProgressWrap.innerHTML = "";
+    doneWrap.innerHTML = "";
+    notDoingWrap.innerHTML = "";
+    pastWrap.innerHTML = "";
+
+    const items = allItems.filter((it) => it.courseId === course.id && isVisible(it));
+    const notYetPast = items.filter((it) => daysBetween(today, parseDate(effDate(it))) >= 0);
+    const upcoming = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "avoin"), false);
+    const inProgress = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "kesken"), false);
+    const done = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "tehty"), false);
+    const notDoing = applyDeadlineSort(notYetPast.filter((it) => getStatus(it) === "ei-tehda"), false);
+    const past = applyDeadlineSort(items.filter((it) => daysBetween(today, parseDate(effDate(it))) < 0), true);
+
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "Ei vielä deadline-tietoja tälle kurssille.";
+      upcomingWrap.appendChild(empty);
+    } else if (upcoming.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "Ei tulevia deadlineja.";
+      upcomingWrap.appendChild(empty);
+    } else {
+      appendDeadlineRows(upcomingWrap, upcoming);
+    }
+
+    document.getElementById("profileInProgressSummary").textContent = "Työn alla (" + inProgress.length + ")";
+    appendDeadlineRows(inProgressWrap, inProgress);
+
+    document.getElementById("profileDoneSummary").textContent = "Tehdyt (" + done.length + ")";
+    appendDeadlineRows(doneWrap, done);
+
+    document.getElementById("profileNotDoingSummary").textContent = "Ei tehdä (" + notDoing.length + ")";
+    appendDeadlineRows(notDoingWrap, notDoing);
+
+    document.getElementById("profilePastSummary").textContent = "Menneet (" + past.length + ")";
+    appendDeadlineRows(pastWrap, past);
+
+    const materialsSection = document.getElementById("profileMaterialsSection");
+    const materialsWrap = document.getElementById("profileMaterials");
+    materialsWrap.innerHTML = "";
+    materialsWrap.style.setProperty("--course-color", course.color || "#3b82f6");
+
+    function buildTopicItemLabel(item) {
+      const title = document.createElement("span");
+      title.textContent = item.title;
+      const typeTag = document.createElement("span");
+      typeTag.className = "topic-item-type";
+      typeTag.textContent = MATERIAL_TYPE_LABELS[item.type] || item.type || "";
+      return { title, typeTag };
+    }
+
+    if (course.topics && course.topics.length) {
+      materialsSection.hidden = false;
+      course.topics.forEach((topic) => {
+        const block = document.createElement("div");
+        block.className = "topic-block";
+
+        const h3 = document.createElement("h3");
+        h3.className = "topic-name";
+        h3.textContent = topic.name;
+        block.appendChild(h3);
+
+        if (topic.summary) {
+          const summaryEl = document.createElement("p");
+          summaryEl.className = "topic-summary";
+          summaryEl.textContent = topic.summary;
+          block.appendChild(summaryEl);
+        }
+
+        if (topic.items && topic.items.length) {
+          const itemsWrap = document.createElement("div");
+          itemsWrap.className = "topic-items";
+          topic.items.forEach((item) => {
+            if (item.content) {
+              const details = document.createElement("details");
+              details.className = "topic-item-content";
+
+              const summaryTag = document.createElement("summary");
+              const linkLike = document.createElement("span");
+              linkLike.className = "topic-item";
+              const { title, typeTag } = buildTopicItemLabel(item);
+              linkLike.appendChild(title);
+              linkLike.appendChild(typeTag);
+              summaryTag.appendChild(linkLike);
+              details.appendChild(summaryTag);
+
+              const body = document.createElement("div");
+              body.className = "topic-item-body";
+              body.textContent = item.content;
+              if (item.url) {
+                const openLink = document.createElement("a");
+                openLink.className = "open-in-moodle";
+                openLink.href = item.url;
+                openLink.target = "_blank";
+                openLink.rel = "noopener";
+                openLink.textContent = "Avaa Moodlessa →";
+                body.appendChild(document.createElement("br"));
+                body.appendChild(openLink);
+              }
+              details.appendChild(body);
+
+              itemsWrap.appendChild(details);
+            } else {
+              const a = document.createElement("a");
+              a.className = "topic-item";
+              a.href = item.url;
+              a.target = "_blank";
+              a.rel = "noopener";
+              const { title, typeTag } = buildTopicItemLabel(item);
+              a.appendChild(title);
+              a.appendChild(typeTag);
+              itemsWrap.appendChild(a);
+            }
+          });
+          block.appendChild(itemsWrap);
+        } else if (!topic.summary) {
+          const empty = document.createElement("div");
+          empty.className = "empty-note";
+          empty.textContent = "Ei materiaaleja tässä aiheessa.";
+          block.appendChild(empty);
+        }
+
+        materialsWrap.appendChild(block);
+      });
+    } else {
+      materialsSection.hidden = true;
+    }
+  }
+
+  function renderAll() {
+    renderChips();
+    renderSummary();
+    renderLists();
+    renderCourses();
+  }
+
+  // Kunkin deadline-kohteen oma "työskentelyjakso" (aloitus viimeistään ->
+  // deadline), sama laskenta kuin renderDeadlineItem()/updateStartBy():ssa,
+  // jotta kalenterin palkit täsmäävät deadline-listan "Aloita viimeistään"
+  // -sarakkeeseen. Palautaa null jos tuntimäärä/tahti puuttuu kokonaan.
+  function getItemPlanRange(item) {
+    const key = itemKey(item.courseId, item);
+    const plan = planMap[key] || {};
+    const hours = plan.hours != null ? plan.hours : item.estimatedHours;
+    const pace = plan.pace != null ? plan.pace : item.estimatedPace;
+    if (!hours || !pace) return null;
+    const deadlineDate = parseDate(effDate(item));
+    const weeksNeeded = hours / pace;
+    const startDate = new Date(deadlineDate.getTime() - Math.round(weeksNeeded * 7) * 86400000);
+    return { startDate, deadlineDate };
+  }
+
+  function computeCalendarBars() {
+    const studyBars = allItems
+      .filter((it) => isVisible(it))
+      .map((it) => {
+        const range = getItemPlanRange(it);
+        return range ? { item: it, startDate: range.startDate, deadlineDate: range.deadlineDate, kind: "study" } : null;
+      })
+      .filter(Boolean);
+    return studyBars.concat(computeExamWindowBars());
+  }
+
+  // Piirtää kalenteriin oman palkin koko EXAM-varausikkunalle (ei vain
+  // deadline-päivälle), jaettuna kahteen osaan sen mukaan mikä osa
+  // ikkunasta on JO varattavissa EXAM-järjestelmässä juuri nyt (ks.
+  // getExamAvailability/EXAM_BOOKING_HORIZON_DAYS) — näin näkee suoraan
+  // kalenterista onko aikoja jo tarjolla vai ei. Palkkia ei piirretä enää
+  // sen jälkeen kun oma EXAM-aika on varattu ja merkitty (getExamOverride).
+  function computeExamWindowBars() {
+    const bars = [];
+    allItems.forEach((it) => {
+      if (!isVisible(it)) return;
+      if (!it.examWindowStart || !it.examWindowEnd) return;
+      if (getExamOverride(it)) return;
+      const windowStart = parseDate(it.examWindowStart);
+      const windowEnd = parseDate(it.examWindowEnd);
+      const avail = getExamAvailability(it.courseId, it.examWindowEnd);
+      if (avail.status === "full") {
+        bars.push({ item: it, startDate: windowStart, deadlineDate: windowEnd, kind: "examwin-open" });
+      } else if (avail.status === "none") {
+        bars.push({ item: it, startDate: windowStart, deadlineDate: windowEnd, kind: "examwin-closed" });
+      } else {
+        const bookableUntil = new Date(today.getTime() + EXAM_BOOKING_HORIZON_DAYS * 86400000);
+        const openEnd = bookableUntil < windowEnd ? bookableUntil : windowEnd;
+        bars.push({ item: it, startDate: windowStart, deadlineDate: openEnd, kind: "examwin-open" });
+        const closedStart = new Date(openEnd.getTime() + 86400000);
+        if (closedStart <= windowEnd) {
+          bars.push({ item: it, startDate: closedStart, deadlineDate: windowEnd, kind: "examwin-closed" });
+        }
+      }
+    });
+    return bars;
+  }
+
+  // Laskee yhden viikon näkyvät työskentelyjaksot: kunkin jakson sarake-
+  // väli (rajattuna tämän kuukauden näkyviin päiviin) ja "kaistan" johon se
+  // sijoitetaan ettei päällekkäiset jaksot mene päällekkäin. Palauttaa vain
+  // datan, ei DOM-elementtejä - palkit piirretään osana samaa ruudukkoa kuin
+  // päivälaatikot, jotta ne näyttävät kuuluvan kalenteriin eivätkä ikään kuin
+  // kellu laatikoiden ulkopuolella.
+  function computeWeekBarOverlaps(week, bars) {
+    if (!week.length) return { overlaps: [], laneCount: 0 };
+    const weekFirstDate = week[0].dateObj;
+    const weekLastDate = week[week.length - 1].dateObj;
+    const isoToCol = {};
+    week.forEach((c) => { isoToCol[c.iso] = c.weekdayIdx + 1; });
+
+    const overlaps = [];
+    bars.forEach((b) => {
+      if (b.deadlineDate < weekFirstDate || b.startDate > weekLastDate) return;
+      const overlapStart = b.startDate < weekFirstDate ? weekFirstDate : b.startDate;
+      const overlapEnd = b.deadlineDate > weekLastDate ? weekLastDate : b.deadlineDate;
+      const startCol = isoToCol[toIsoDate(overlapStart)];
+      const endCol = isoToCol[toIsoDate(overlapEnd)];
+      if (startCol == null || endCol == null) return;
+      overlaps.push({
+        bar: b,
+        startCol,
+        endCol,
+        continuesBefore: b.startDate < weekFirstDate,
+        continuesAfter: b.deadlineDate > weekLastDate,
+      });
+    });
+    if (!overlaps.length) return { overlaps: [], laneCount: 0 };
+
+    overlaps.sort((a, b) => a.startCol - b.startCol || a.endCol - b.endCol);
+    const laneEnds = [];
+    overlaps.forEach((ov) => {
+      let lane = laneEnds.findIndex((end) => end < ov.startCol);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(ov.endCol); }
+      else laneEnds[lane] = ov.endCol;
+      ov.lane = lane;
+    });
+
+    return { overlaps, laneCount: laneEnds.length };
+  }
+
+  function createCalendarBarEl(ov) {
+    const item = ov.bar.item;
+    const kind = ov.bar.kind || "study";
+    const status = getStatus(item);
+
+    const el = document.createElement("div");
+    el.className = "calendar-bar" +
+      " bar-kind-" + kind +
+      (ov.continuesBefore ? " bar-continues-start" : "") +
+      (ov.continuesAfter ? " bar-continues-end" : "") +
+      (status === "tehty" ? " bar-status-tehty" : status === "ei-tehda" ? " bar-status-ei-tehda" : status === "kesken" ? " bar-status-kesken" : "");
+    el.style.gridColumn = ov.startCol + " / " + (ov.endCol + 1);
+    el.style.gridRow = String(2 + ov.lane);
+    el.style.setProperty("--bar-color", item.color);
+
+    let label;
+    if (kind === "examwin-open") {
+      label = "EXAM auki: " + item.courseName;
+      el.title =
+        item.courseName + ": EXAM-ikkuna varattavissa juuri nyt " +
+        fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
+        (status === "tehty" ? " (merkitty tehdyksi)" : status === "ei-tehda" ? " (merkitty: ei tehdä)" : status === "kesken" ? " (työn alla)" : "");
+    } else if (kind === "examwin-closed") {
+      label = "EXAM ei vielä auki: " + item.courseName;
+      el.title =
+        item.courseName + ": EXAM-ikkunan osa ei ole vielä varattavissa (" +
+        fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
+        ") — EXAM-järjestelmä avaa aikoja vasta n. " + EXAM_BOOKING_HORIZON_DAYS + " vrk etukäteen." +
+        (status === "tehty" ? " (merkitty tehdyksi)" : status === "ei-tehda" ? " (merkitty: ei tehdä)" : status === "kesken" ? " (työn alla)" : "");
+    } else {
+      label = displayTitle(item);
+      el.title =
+        item.courseName + ": " + displayTitle(item) +
+        " — työskentely " + fmtDate(ov.bar.startDate) + " → " + fmtDate(ov.bar.deadlineDate) +
+        (status === "tehty" ? " (tehty)" : status === "ei-tehda" ? " (ei tehdä)" : status === "kesken" ? " (työn alla)" : "");
+    }
+    el.textContent = (ov.continuesBefore ? "… " : "") + label;
+
+    el.onclick = (e) => {
+      e.stopPropagation();
+      selectedDate = toIsoDate(ov.bar.deadlineDate);
+      renderCalendar();
+      renderDayDetail();
+    };
+    return el;
+  }
+
+  function renderCalendar() {
+    const grid = document.getElementById("calendarGrid");
+    grid.innerHTML = "";
+    const itemsByDateNow = getItemsByDate();
+    const bars = computeCalendarBars();
+
+    const base = new Date(today.getFullYear(), today.getMonth() + calMonthOffset, 1);
+    const year = base.getFullYear();
+    const month = base.getMonth();
+
+    document.getElementById("calTitle").textContent =
+      base.toLocaleDateString("fi-FI", { month: "long", year: "numeric" });
+
+    WEEKDAYS_FI.forEach((wd) => {
+      const el = document.createElement("div");
+      el.className = "calendar-weekday";
+      el.textContent = wd;
+      grid.appendChild(el);
+    });
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayIso = toIsoDate(today);
+
+    // Ryhmittele kuukauden päivät viikkoriveiksi (ma-su), jotta jokaiselle
+    // viikolle voidaan piirtää oma palkkirivi työskentelyjaksoille.
+    const weeks = [];
+    let currentWeek = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateObj = new Date(year, month, day);
+      // JS getDay(): 0=su,1=ma,...,6=la. Muunnetaan niin että viikko alkaa maanantaista.
+      const weekdayIdx = (dateObj.getDay() + 6) % 7;
+      if (currentWeek.length && weekdayIdx === 0) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+      currentWeek.push({ day, dateObj, iso: toIsoDate(dateObj), weekdayIdx });
+    }
+    if (currentWeek.length) weeks.push(currentWeek);
+
+    weeks.forEach((week) => {
+      const { overlaps, laneCount } = computeWeekBarOverlaps(week, bars);
+
+      const weekBlock = document.createElement("div");
+      weekBlock.className = "calendar-week-block";
+      weekBlock.style.gridColumn = "1 / -1";
+      // Rivi 1 = päivälaatikon "otsikko-osa" (numero + tavalliset chipit),
+      // sen jälkeen yksi 15px:n rivi per työskentelyjakson kaista. Päivä-
+      // laatikko ulottuu itse kaikkien näiden rivien yli, jotta palkit
+      // näyttävät kuuluvan laatikon SISÄLLE eivätkä kellu sen alapuolella.
+      weekBlock.style.gridTemplateRows = "76px" + (laneCount ? " repeat(" + laneCount + ", 19px)" : "") + " 2px";
+
+      week.forEach((c) => {
+        const iso = c.iso;
+        const isWeekend = c.weekdayIdx >= 5;
+
+        const cell = document.createElement("div");
+        cell.className = "calendar-day" + (iso === todayIso ? " today" : "") + (iso === selectedDate ? " selected" : "");
+        cell.style.gridColumn = String(c.weekdayIdx + 1);
+        cell.style.gridRow = "1 / span " + (2 + laneCount);
+
+        const num = document.createElement("div");
+        num.className = "day-num" + (isWeekend ? " weekend" : "");
+        num.textContent = c.day;
+        cell.appendChild(num);
+
+        // Kohteet joilla on Arvio+Tahti täytettynä näkyvät jo omana
+        // työskentelypalkkinaan (ks. computeCalendarBars) joka päättyy
+        // juuri tähän päivään - niitä ei siis näytetä myös pienenä chippinä
+        // päivälaatikon sisällä, ettei sama tehtävä näytä "alkavan uudestaan"
+        // deadline-päivänä kun se on jo näkynyt palkkina koko jakson ajan.
+        const dayItems = (itemsByDateNow[iso] || [])
+          .filter((it) => !getItemPlanRange(it))
+          .slice()
+          .sort((a, b) => a.title.localeCompare(b.title));
+        dayItems.slice(0, 3).forEach((it) => {
+          const chip = document.createElement("div");
+          const chipStatus = getStatus(it);
+          chip.className = "calendar-chip" +
+            (chipStatus === "tehty" ? " chip-status-tehty" : chipStatus === "ei-tehda" ? " chip-status-ei-tehda" : chipStatus === "kesken" ? " chip-status-kesken" : "");
+          chip.style.setProperty("--chip-color", it.color);
+          chip.textContent = it.title;
+          cell.appendChild(chip);
+        });
+        if (dayItems.length > 3) {
+          const more = document.createElement("div");
+          more.className = "more";
+          more.textContent = "+" + (dayItems.length - 3) + " lisää";
+          cell.appendChild(more);
+        }
+
+        cell.onclick = () => {
+          selectedDate = iso;
+          renderCalendar();
+          renderDayDetail();
+        };
+
+        weekBlock.appendChild(cell);
+      });
+
+      // Palkit lisätään VASTA päivälaatikoiden jälkeen, jotta ne piirtyvät
+      // laatikoiden päälle (samaan ruudukon kohtaan) eivätkä niiden alle.
+      overlaps.forEach((ov) => weekBlock.appendChild(createCalendarBarEl(ov)));
+
+      grid.appendChild(weekBlock);
+    });
+  }
+
+  function renderWeek() {
+    const monday = getWeekMonday(weekOffset);
+    const sunday = new Date(monday.getTime() + 6 * 86400000);
+    document.getElementById("weekTitle").textContent =
+      fmtShort(monday) + " – " + sunday.toLocaleDateString("fi-FI", { day: "numeric", month: "numeric", year: "numeric" });
+
+    const capRow = document.getElementById("weekCapacityRow");
+    capRow.innerHTML = "";
+    WEEKDAYS_FI.forEach((wd, idx) => {
+      const cell = document.createElement("div");
+      cell.className = "week-capacity-cell";
+      const label = document.createElement("span");
+      label.textContent = wd;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = "16";
+      input.step = "0.5";
+      input.value = capacityArr[idx];
+      input.title = wd + ": tuntia opiskelua per päivä";
+      input.onchange = () => {
+        let v = parseFloat(input.value);
+        if (!Number.isFinite(v) || v < 0) v = 0;
+        input.value = v;
+        capacityArr[idx] = v;
+        saveCapacityMap(capacityArr);
+        renderWeek();
+      };
+      cell.appendChild(label);
+      cell.appendChild(input);
+      capRow.appendChild(cell);
+    });
+
+    const { perDay, overflow, noEstimate } = computeWeekAllocation();
+
+    const warningEl = document.getElementById("weekWarning");
+    if (overflow.length) {
+      warningEl.hidden = false;
+      warningEl.innerHTML = "";
+      const heading = document.createElement("div");
+      heading.innerHTML = "<strong>Ei mahdu tälle aikataululle nykyisellä opiskelutahdilla:</strong>";
+      warningEl.appendChild(heading);
+      overflow.forEach((o) => {
+        const line = document.createElement("div");
+        line.textContent = displayTitle(o.item) + " (" + o.item.courseName + ") — " +
+          Math.round(o.missingHours * 10) / 10 + "h puuttuu";
+        warningEl.appendChild(line);
+      });
+    } else {
+      warningEl.hidden = true;
+    }
+
+    const noEstEl = document.getElementById("weekNoEstimate");
+    if (noEstimate.length) {
+      noEstEl.hidden = false;
+      noEstEl.innerHTML = "<strong>Ei aika-arviota, ei aikataulutettu:</strong> " +
+        noEstimate.map((it) => displayTitle(it) + " (" + it.courseName + ")").join(", ");
+    } else {
+      noEstEl.hidden = true;
+    }
+
+    const grid2 = document.getElementById("weekGrid");
+    grid2.innerHTML = "";
+    const todayIso = toIsoDate(today);
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(monday.getTime() + i * 86400000);
+      const iso = toIsoDate(dayDate);
+      const isPast = dayDate < today;
+      const col = document.createElement("div");
+      col.className = "week-day-col" + (iso === todayIso ? " today" : "") + (isPast ? " past" : "");
+
+      const head = document.createElement("div");
+      head.className = "week-day-head";
+      head.innerHTML = "<span class=\"weekday-name\">" + WEEKDAYS_FI[i] + "</span>" + dayDate.getDate() + "." + (dayDate.getMonth() + 1) + ".";
+      col.appendChild(head);
+
+      const dayOff = noStudySet.has(iso);
+      if (!isPast) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "week-nostudy-toggle" + (dayOff ? " active" : "");
+        toggle.textContent = dayOff ? "Ei opiskella ✓" : "Ei opiskella";
+        toggle.title = dayOff ? "Poista merkintä, tämä päivä on taas käytettävissä" : "Merkitse ettei tänä päivänä opiskella (esim. muuta menoa)";
+        toggle.onclick = () => {
+          if (noStudySet.has(iso)) noStudySet.delete(iso);
+          else noStudySet.add(iso);
+          saveNoStudySet(noStudySet);
+          renderWeek();
+        };
+        col.appendChild(toggle);
+      }
+
+      if (dayOff) {
+        col.classList.add("no-study");
+        const offNote = document.createElement("div");
+        offNote.className = "week-day-empty";
+        offNote.textContent = "Ei opiskella";
+        col.appendChild(offNote);
+      } else {
+        const entries = perDay[iso] || [];
+        let total = 0;
+        entries.forEach((e) => {
+          total += e.hours;
+          const chip = document.createElement("div");
+          chip.className = "week-chip";
+          chip.style.setProperty("--chip-color", e.item.color);
+          chip.textContent = displayTitle(e.item) + " · " + (Math.round(e.hours * 10) / 10) + "h";
+          chip.title = e.item.courseName;
+          col.appendChild(chip);
+        });
+        if (!entries.length && !isPast) {
+          const empty = document.createElement("div");
+          empty.className = "week-day-empty";
+          empty.textContent = "—";
+          col.appendChild(empty);
+        }
+        if (total > 0) {
+          const totalEl = document.createElement("div");
+          totalEl.className = "week-day-total";
+          totalEl.textContent = (Math.round(total * 10) / 10) + " / " + capacityArr[i] + " h";
+          col.appendChild(totalEl);
+        }
+      }
+      grid2.appendChild(col);
+    }
+  }
+
+  // Palauttaa ne kohteet joiden arvioitu työskentelyjakso (ks.
+  // getItemPlanRange/computeCalendarBars, sama laskenta kuin kalenterin
+  // väripalkeissa) kattaa annetun päivän — eli mitä pitäisi olla tekemässä
+  // sinä päivänä, vaikka itse deadline olisi vasta myöhemmin. EXAM-ikkuna-
+  // palkkeja (kind !== "study") ei lasketa mukaan, koska ne kertovat
+  // varausikkunan tilasta eivät tehtävästä työstä.
+  function getInProgressItemsForDate(iso) {
+    const dt = parseDate(iso);
+    const seen = new Set();
+    const result = [];
+    computeCalendarBars().forEach((b) => {
+      if (b.kind !== "study") return;
+      if (dt < b.startDate || dt > b.deadlineDate) return;
+      const key = itemKey(b.item.courseId, b.item);
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(b);
+    });
+    return result;
+  }
+
+  function renderInProgressSection(wrap, iso, excludeKeys) {
+    const inProgress = getInProgressItemsForDate(iso).filter(
+      (b) => !excludeKeys.has(itemKey(b.item.courseId, b.item))
+    );
+    if (!inProgress.length) return;
+
+    const heading = document.createElement("div");
+    heading.className = "inprogress-heading";
+    heading.textContent = "Työn alla tänä päivänä";
+    wrap.appendChild(heading);
+
+    const list = document.createElement("div");
+    list.className = "inprogress-list";
+    inProgress
+      .sort((a, b) => a.deadlineDate - b.deadlineDate)
+      .forEach((b) => {
+        const item = b.item;
+        const status = getStatus(item);
+        const row = document.createElement("div");
+        row.className = "inprogress-item" + (status !== "avoin" ? " status-" + status : "");
+        row.style.setProperty("--item-color", item.color);
+
+        const moodleUrl = getCourseMoodleUrl(item.courseId);
+        const title = document.createElement(moodleUrl ? "a" : "span");
+        title.className = "title";
+        title.textContent = displayTitle(item);
+        if (moodleUrl) {
+          title.href = moodleUrl;
+          title.target = "_blank";
+          title.rel = "noopener";
+          title.onclick = (e) => e.stopPropagation();
+        }
+        row.appendChild(title);
+
+        const tag = document.createElement("span");
+        tag.className = "course-tag";
+        tag.textContent = item.courseName;
+        row.appendChild(tag);
+
+        const meta = document.createElement("span");
+        meta.className = "meta";
+        meta.textContent = "deadline " + fmtDate(b.deadlineDate);
+        row.appendChild(meta);
+
+        row.title =
+          item.courseName + ": " + displayTitle(item) +
+          " — työskentely " + fmtDate(b.startDate) + " → " + fmtDate(b.deadlineDate) +
+          (moodleUrl ? " (nimeä klikkaamalla Moodleen)" : "");
+        row.onclick = () => {
+          selectedDate = toIsoDate(b.deadlineDate);
+          renderCalendar();
+          renderDayDetail();
+        };
+        list.appendChild(row);
+      });
+    wrap.appendChild(list);
+  }
+
+  function renderDayDetail() {
+    const wrap = document.getElementById("calendarDayDetail");
+    wrap.innerHTML = "";
+    if (!selectedDate) return;
+
+    const dt = parseDate(selectedDate);
+    const heading = document.createElement("h3");
+    heading.textContent = dt.toLocaleDateString("fi-FI", { weekday: "long", day: "numeric", month: "long" });
+    wrap.appendChild(heading);
+
+    const itemsByDateNow = getItemsByDate();
+    const items = (itemsByDateNow[selectedDate] || []).slice().sort((a, b) => a.title.localeCompare(b.title));
+    const excludeKeys = new Set(items.map((it) => itemKey(it.courseId, it)));
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-note";
+      empty.textContent = "Ei deadlineja tälle päivälle.";
+      wrap.appendChild(empty);
+    } else {
+      const list = document.createElement("div");
+      list.className = "deadline-list";
+      appendDeadlineRows(list, items);
+      wrap.appendChild(list);
+    }
+
+    renderInProgressSection(wrap, selectedDate, excludeKeys);
+  }
+
+  function setNavActive(view) {
+    document.getElementById("navDashboard").classList.toggle("active", view === "dashboard");
+    document.getElementById("navKalenteri").classList.toggle("active", view === "kalenteri");
+    document.getElementById("navViikko").classList.toggle("active", view === "viikko");
+    document.getElementById("navAsetukset").classList.toggle("active", view === "asetukset");
+  }
+
+  function showDashboard() {
+    document.getElementById("dashboardView").hidden = false;
+    document.getElementById("calendarView").hidden = true;
+    document.getElementById("weekView").hidden = true;
+    document.getElementById("profileView").hidden = true;
+    document.getElementById("settingsView").hidden = true;
+    setNavActive("dashboard");
+    renderAll();
+  }
+
+  function showCalendar() {
+    document.getElementById("dashboardView").hidden = true;
+    document.getElementById("calendarView").hidden = false;
+    document.getElementById("weekView").hidden = true;
+    document.getElementById("profileView").hidden = true;
+    document.getElementById("settingsView").hidden = true;
+    setNavActive("kalenteri");
+    renderCalendar();
+    renderDayDetail();
+  }
+
+  function showWeek() {
+    document.getElementById("dashboardView").hidden = true;
+    document.getElementById("calendarView").hidden = true;
+    document.getElementById("weekView").hidden = false;
+    document.getElementById("profileView").hidden = true;
+    document.getElementById("settingsView").hidden = true;
+    setNavActive("viikko");
+    renderWeek();
+  }
+
+  function showProfile(course) {
+    document.getElementById("dashboardView").hidden = true;
+    document.getElementById("calendarView").hidden = true;
+    document.getElementById("weekView").hidden = true;
+    document.getElementById("profileView").hidden = false;
+    document.getElementById("settingsView").hidden = true;
+    setNavActive(null);
+    renderProfile(course);
+  }
+
+  // Asetukset-näkymä: kaikki .env-pohjaiset parametrit (Moodle-kirjautuminen,
+  // Google-OAuth, DeepSeek-avain) yhdessä muokattavassa näkymässä, jotta
+  // niitä ei tarvitse muokata käsin .env-tiedostosta - erityisen tarpeellista
+  // nyt kun dashboardista tehdään jaettava repo luokkalaisille. Arvoja EI
+  // koskaan lueta takaisin selaimeen: GET
+  // /api/settings/status kertoo vain onko avain jo asetettu, POST
+  // /api/settings kirjoittaa vain juuri syötetyt/pyydetyt muutokset
+  // palvelimen .env-tiedostoon. Toimii vain server.js:n kautta ajettuna.
+  const SETTINGS_GROUPS = [
+    {
+      id: "moodle",
+      title: "Moodle-kirjautuminen",
+      hint:
+        "Täytä JOKO käyttäjätunnus+salasana (suositus - hoitaa kirjautumisen ja istunnon " +
+        "uusimisen kokonaan automaattisesti) TAI pelkkä MoodleSession-eväste (jos et halua " +
+        "tallentaa salasanaasi tänne). Jos molemmat on asetettu, evästettä käytetään ensin " +
+        "ja se uusitaan automaattisesti vain kun se vanhenee.",
+      fields: [
+        { key: "MOODLE_USERNAME", label: "Käyttäjätunnus", sub: "SAMK-tunnuksesi (Haka)" },
+        { key: "MOODLE_PASSWORD", label: "Salasana", password: true, sub: "Tallennetaan selkokielisenä .env-tiedostoon - suojaa koneesi normaalisti" },
+        { key: "MOODLE_SESSION", label: "MoodleSession-eväste", password: true, sub: "DevToolsista haettu arvo, vaihtoehto yllä oleville" },
+        { key: "MOODLE_USERID", label: "Oma Moodle-käyttäjä-id", sub: "Numero kalenterin ICS-vientilinkin \"userid=\"-parametrista tai Moodlen profiilisivun osoitteesta. Tarvitaan uusien kurssien löytämiseen." },
+      ],
+    },
+    {
+      id: "google",
+      title: "Google-kalenterisynkka",
+      hint: "OAuth-clientin tiedot Google Cloud Consolesta, ks. README.md:n osio \"Google-kalenterisynkka\".",
+      fields: [
+        { key: "GOOGLE_CLIENT_ID", label: "Client ID", password: true },
+        { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", password: true },
+      ],
+    },
+    {
+      id: "deepseek",
+      title: "DeepSeek-aika-arviot",
+      optionalBadge: "Valinnainen",
+      hint:
+        "Jos jätät tämän tyhjäksi, dashboard toimii silti täysin normaalisti - uudet " +
+        "Moodle-skannauksessa löytyvät tehtävät lisätään vain ilman automaattista " +
+        "tuntiarviota. Oman avaimen saa osoitteesta platform.deepseek.com.",
+      fields: [{ key: "DEEPSEEK_API_KEY", label: "API-avain", password: true }],
+    },
+  ];
+
+  let settingsStatus = {};
+  let settingsClearPending = new Set();
+
+  function updateSettingsFieldStatus(key) {
+    const status = document.getElementById("setStatus_" + key);
+    const clearBtn = document.getElementById("setClear_" + key);
+    if (!status || !clearBtn) return;
+    const pending = settingsClearPending.has(key);
+    const isSet = !!settingsStatus[key];
+    const inputEl = document.getElementById("setField_" + key);
+    if (inputEl) {
+      inputEl.placeholder = pending
+        ? "Arvo poistetaan tallennettaessa"
+        : isSet
+          ? "Tallennettu. Jätä tyhjäksi säilyttääksesi"
+          : "Kirjoita arvo";
+    }
+    if (pending) {
+      status.textContent = "Tyhjennet\u00e4\u00e4n tallennettaessa";
+      status.className = "settings-status pending-clear";
+      clearBtn.textContent = "Peru tyhjennys";
+      clearBtn.hidden = false;
+    } else {
+      status.textContent = isSet ? "Asetettu \u2713" : "Ei asetettu";
+      status.className = "settings-status " + (isSet ? "is-set" : "is-unset");
+      clearBtn.textContent = "Tyhjenn\u00e4";
+      clearBtn.hidden = !isSet;
+    }
+  }
+
+  function renderSettingsGroups() {
+    const wrap = document.getElementById("settingsGroups");
+    wrap.innerHTML = "";
+    SETTINGS_GROUPS.forEach((group) => {
+      const card = document.createElement("div");
+      card.className = "settings-card";
+
+      const head = document.createElement("div");
+      head.className = "settings-card-head";
+      const h = document.createElement("h3");
+      h.appendChild(document.createTextNode(group.title));
+      if (group.optionalBadge) {
+        const badge = document.createElement("span");
+        badge.className = "settings-optional-badge";
+        badge.textContent = group.optionalBadge;
+        h.appendChild(badge);
+      }
+      head.appendChild(h);
+
+      if (group.hint) {
+        const hint = document.createElement("p");
+        hint.className = "field-hint";
+        hint.textContent = group.hint;
+        head.appendChild(hint);
+      }
+      card.appendChild(head);
+
+      const fieldsWrap = document.createElement("div");
+      fieldsWrap.className = "settings-fields";
+      card.appendChild(fieldsWrap);
+
+      group.fields.forEach((f) => {
+        const row = document.createElement("div");
+        row.className = "settings-field";
+
+        const meta = document.createElement("div");
+        meta.className = "settings-field-meta";
+        const label = document.createElement("label");
+        label.className = "field-label";
+        label.htmlFor = "setField_" + f.key;
+        label.textContent = f.label;
+        meta.appendChild(label);
+        const control = document.createElement("div");
+        control.className = "settings-field-control";
+        const input = document.createElement("input");
+        input.type = f.password ? "password" : "text";
+        input.id = "setField_" + f.key;
+        input.autocomplete = "off";
+        input.placeholder = "Kirjoita arvo";
+        input.oninput = () => {
+          if (input.value && settingsClearPending.has(f.key)) {
+            settingsClearPending.delete(f.key);
+            updateSettingsFieldStatus(f.key);
+          }
+        };
+        control.appendChild(input);
+        if (f.sub) {
+          const sub = document.createElement("div");
+          sub.className = "field-sub-hint";
+          sub.textContent = f.sub;
+          meta.appendChild(sub);
+        }
+        row.appendChild(meta);
+        row.appendChild(control);
+
+        const statusWrap = document.createElement("div");
+        statusWrap.className = "settings-status-wrap";
+        const status = document.createElement("span");
+        status.className = "settings-status";
+        status.id = "setStatus_" + f.key;
+        statusWrap.appendChild(status);
+        const clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.className = "settings-clear-btn";
+        clearBtn.id = "setClear_" + f.key;
+        clearBtn.onclick = () => {
+          if (settingsClearPending.has(f.key)) {
+            settingsClearPending.delete(f.key);
+          } else {
+            settingsClearPending.add(f.key);
+            input.value = "";
+          }
+          updateSettingsFieldStatus(f.key);
+        };
+        statusWrap.appendChild(clearBtn);
+        control.appendChild(statusWrap);
+
+        fieldsWrap.appendChild(row);
+      });
+
+      wrap.appendChild(card);
+    });
+  }
+
+  async function loadSettingsStatus() {
+    const offlineNote = document.getElementById("settingsOffline");
+    try {
+      const res = await fetch("/api/settings/status");
+      const body = await res.json();
+      if (!res.ok || !body.ok) throw new Error((body && body.error) || "HTTP " + res.status);
+      settingsStatus = body.status || {};
+      offlineNote.hidden = true;
+    } catch (err) {
+      settingsStatus = {};
+      offlineNote.hidden = false;
+    }
+    SETTINGS_GROUPS.forEach((g) => g.fields.forEach((f) => updateSettingsFieldStatus(f.key)));
+  }
+
+  function showSettings() {
+    document.getElementById("dashboardView").hidden = true;
+    document.getElementById("calendarView").hidden = true;
+    document.getElementById("weekView").hidden = true;
+    document.getElementById("profileView").hidden = true;
+    document.getElementById("settingsView").hidden = false;
+    setNavActive("asetukset");
+    settingsClearPending = new Set();
+    const statusEl = document.getElementById("settingsSaveStatus");
+    statusEl.textContent = "";
+    statusEl.className = "settings-save-status";
+    renderSettingsGroups();
+    loadSettingsStatus();
+  }
+
+  // Reititys hash-osoitteen perusteella (#kurssi/<id>, #kalenteri), jotta
+  // jokaisella kurssilla ja kalenterilla on oma näkymä ilman erillisiä
+  // html-tiedostoja.
+  function route() {
+    if (location.hash === "#kalenteri") {
+      showCalendar();
+      return;
+    }
+    if (location.hash === "#viikko") {
+      showWeek();
+      return;
+    }
+    if (location.hash === "#asetukset") {
+      showSettings();
+      return;
+    }
+    const m = location.hash.match(/^#kurssi\/(.+)$/);
+    const course = m ? courseById[decodeURIComponent(m[1])] : null;
+    if (course) showProfile(course);
+    else showDashboard();
+  }
+
+  function refresh() {
+    rebuildAllItems();
+    route();
+  }
+
+  window.addEventListener("hashchange", route);
+  document.getElementById("backLink").onclick = (e) => {
+    e.preventDefault();
+    location.hash = "";
+    route();
+  };
+  document.getElementById("navDashboard").onclick = (e) => {
+    e.preventDefault();
+    location.hash = "";
+    route();
+  };
+  document.getElementById("navKalenteri").onclick = (e) => {
+    e.preventDefault();
+    location.hash = "#kalenteri";
+    route();
+  };
+  document.getElementById("navViikko").onclick = (e) => {
+    e.preventDefault();
+    location.hash = "#viikko";
+    route();
+  };
+  document.getElementById("weekPrev").onclick = () => {
+    weekOffset -= 1;
+    renderWeek();
+  };
+  document.getElementById("weekNext").onclick = () => {
+    weekOffset += 1;
+    renderWeek();
+  };
+  document.getElementById("weekToday").onclick = () => {
+    weekOffset = 0;
+    renderWeek();
+  };
+  document.getElementById("calPrev").onclick = () => {
+    calMonthOffset -= 1;
+    renderCalendar();
+  };
+  document.getElementById("calNext").onclick = () => {
+    calMonthOffset += 1;
+    renderCalendar();
+  };
+  document.getElementById("calToday").onclick = () => {
+    calMonthOffset = 0;
+    selectedDate = toIsoDate(today);
+    renderCalendar();
+    renderDayDetail();
+  };
+
+  // Tehtävien muokkaus- ja luontilomake (modaali). Sama lomake toimii sekä
+  // uuden oman tehtävän luontiin että olemassa olevan (Moodle-peräisen tai
+  // oman) tehtävän muokkaukseen. taskFormState pitää kirjaa siitä kumpaa
+  // tehdään ja mihin kohteeseen tallennus kohdistuu.
+  let taskFormState = null;
+
+  function populateCourseSelect(select, selectedCourseId, disabled) {
+    select.innerHTML = "";
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "Ei kurssia";
+    select.appendChild(noneOpt);
+    COURSES.filter((c) => getCourseState(c.id) !== "hidden").forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    });
+    select.value = selectedCourseId || "";
+    select.disabled = !!disabled;
+  }
+
+  function populateTypeSelect(select, selectedType) {
+    select.innerHTML = "";
+    Object.keys(TYPE_LABELS).forEach((key) => {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = TYPE_LABELS[key];
+      select.appendChild(opt);
+    });
+    select.value = selectedType || "task";
+  }
+
+  function openTaskForm(opts) {
+    const mode = opts.mode;
+    const item = opts.item || null;
+    taskFormState = { mode, item };
+
+    const heading = document.getElementById("taskFormHeading");
+    const titleInput = document.getElementById("taskFormTitle");
+    const courseSelect = document.getElementById("taskFormCourse");
+    const courseLockHint = document.getElementById("taskFormCourseLock");
+    const dateInput = document.getElementById("taskFormDate");
+    const typeSelect = document.getElementById("taskFormType");
+    const notesInput = document.getElementById("taskFormNotes");
+    const estimateRow = document.getElementById("taskFormEstimateRow");
+    const estimateHint = document.getElementById("taskFormEstimateHint");
+    const hoursInput = document.getElementById("taskFormHours");
+    const paceInput = document.getElementById("taskFormPace");
+    const revertBtn = document.getElementById("taskFormRevert");
+
+    if (mode === "create") {
+      heading.textContent = "Uusi tehtävä";
+      titleInput.value = "";
+      populateCourseSelect(courseSelect, opts.courseId || "", false);
+      courseLockHint.hidden = true;
+      dateInput.value = toIsoDate(today);
+      populateTypeSelect(typeSelect, "task");
+      notesInput.value = "";
+      estimateRow.hidden = false;
+      estimateHint.hidden = true;
+      hoursInput.value = "";
+      paceInput.value = "";
+      revertBtn.hidden = true;
+    } else if (item.isCustom) {
+      heading.textContent = "Muokkaa tehtävää";
+      titleInput.value = item.title;
+      populateCourseSelect(courseSelect, item.courseId === "oma" ? "" : item.courseId, false);
+      courseLockHint.hidden = true;
+      dateInput.value = item.date;
+      populateTypeSelect(typeSelect, item.type);
+      notesInput.value = item.notes || "";
+      estimateRow.hidden = false;
+      estimateHint.hidden = true;
+      hoursInput.value = item.estimatedHours != null ? item.estimatedHours : "";
+      paceInput.value = item.estimatedPace != null ? item.estimatedPace : "";
+      revertBtn.hidden = true;
+    } else {
+      const edit = getUserEdit(item) || {};
+      heading.textContent = "Muokkaa tehtävää";
+      titleInput.value = edit.title != null ? edit.title : item.title;
+      populateCourseSelect(courseSelect, item.courseId, true);
+      courseLockHint.hidden = false;
+      dateInput.value = edit.date != null ? edit.date : item.date;
+      populateTypeSelect(typeSelect, edit.type != null ? edit.type : item.type);
+      notesInput.value = edit.notes != null ? edit.notes : (item.notes || "");
+      estimateRow.hidden = true;
+      estimateHint.hidden = false;
+      hoursInput.value = "";
+      paceInput.value = "";
+      revertBtn.hidden = !getUserEdit(item);
+    }
+
+    document.getElementById("taskFormOverlay").hidden = false;
+    titleInput.focus();
+  }
+
+  function closeTaskForm() {
+    document.getElementById("taskFormOverlay").hidden = true;
+    taskFormState = null;
+  }
+
+  document.getElementById("taskForm").onsubmit = (e) => {
+    e.preventDefault();
+    if (!taskFormState) return;
+    const mode = taskFormState.mode;
+    const item = taskFormState.item;
+
+    const titleVal = document.getElementById("taskFormTitle").value.trim();
+    const courseVal = document.getElementById("taskFormCourse").value || null;
+    const dateVal = document.getElementById("taskFormDate").value;
+    const typeVal = document.getElementById("taskFormType").value;
+    const notesVal = document.getElementById("taskFormNotes").value.trim();
+    const hoursVal = document.getElementById("taskFormHours").value;
+    const paceVal = document.getElementById("taskFormPace").value;
+
+    if (!titleVal || !dateVal) return;
+
+    if (mode === "create") {
+      const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      customItems.push({
+        id,
+        courseId: courseVal,
+        title: titleVal,
+        date: dateVal,
+        type: typeVal,
+        notes: notesVal,
+        estimatedHours: hoursVal ? parseFloat(hoursVal) : null,
+        estimatedPace: paceVal ? parseFloat(paceVal) : null,
+      });
+      saveCustomItems(customItems);
+    } else if (item.isCustom) {
+      const c = customItems.find((x) => x.id === item.id);
+      if (c) {
+        c.courseId = courseVal;
+        c.title = titleVal;
+        c.date = dateVal;
+        c.type = typeVal;
+        c.notes = notesVal;
+        c.estimatedHours = hoursVal ? parseFloat(hoursVal) : null;
+        c.estimatedPace = paceVal ? parseFloat(paceVal) : null;
+        saveCustomItems(customItems);
+      }
+    } else {
+      const key = itemKey(item.courseId, item);
+      const edit = {};
+      if (titleVal !== item.title) edit.title = titleVal;
+      if (dateVal !== item.date) edit.date = dateVal;
+      if (typeVal !== item.type) edit.type = typeVal;
+      if (notesVal !== (item.notes || "")) edit.notes = notesVal;
+      if (Object.keys(edit).length === 0) delete editsMap[key];
+      else editsMap[key] = edit;
+      saveEditsMap(editsMap);
+    }
+
+    closeTaskForm();
+    refresh();
+  };
+
+  document.getElementById("taskFormRevert").onclick = () => {
+    if (!taskFormState || !taskFormState.item) return;
+    const item = taskFormState.item;
+    const key = itemKey(item.courseId, item);
+    delete editsMap[key];
+    saveEditsMap(editsMap);
+    closeTaskForm();
+    refresh();
+  };
+
+  document.getElementById("taskFormCancel").onclick = () => closeTaskForm();
+
+  document.getElementById("taskFormOverlay").onclick = (e) => {
+    if (e.target === document.getElementById("taskFormOverlay")) closeTaskForm();
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("taskFormOverlay").hidden) closeTaskForm();
+  });
+
+  document.getElementById("addTaskBtnDashboard").onclick = () => openTaskForm({ mode: "create" });
+
+  // "Hae uudet Moodlesta" -nappi: kutsuu server.js:n /api/sync-moodle-
+  // reittiä (ajaa sync_moodle.js:n käyttäjän omalla koneella, jolla on netti
+  // Moodleen - tämä EI toimi jos dashboardia katsotaan suoraan tiedostona
+  // tai jostain muusta kuin server.js:n kautta). Voi kestää pari minuuttia
+  // jos kursseja/aktiviteetteja on paljon.
+  const SYNC_LAST_RUN_KEY = "opintodashboard_last_sync_v1";
+
+  function formatSyncTimestamp(iso) {
+    const d = new Date(iso);
+    return (
+      d.toLocaleDateString("fi-FI", { day: "numeric", month: "numeric" }) +
+      " klo " +
+      d.toLocaleTimeString("fi-FI", { hour: "2-digit", minute: "2-digit" })
+    );
+  }
+
+  (function showLastSyncTime() {
+    let iso = null;
+    try { iso = localStorage.getItem(SYNC_LAST_RUN_KEY); } catch (e) {}
+    if (iso) {
+      document.getElementById("syncStatus").textContent = "Viimeksi haettu " + formatSyncTimestamp(iso);
+    }
+  })();
+
+  document.getElementById("syncMoodleBtn").onclick = async () => {
+    const btn = document.getElementById("syncMoodleBtn");
+    const statusEl = document.getElementById("syncStatus");
+    btn.disabled = true;
+    statusEl.className = "sync-status";
+    statusEl.textContent = "Haetaan Moodlesta... (voi kestää pari minuuttia)";
+
+    try {
+      const res = await fetch("/api/sync-moodle", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok || !body.ok) throw new Error(body.error || "HTTP " + res.status);
+
+      const s = body.summary;
+      try { localStorage.setItem(SYNC_LAST_RUN_KEY, new Date().toISOString()); } catch (e) {}
+
+      const parts = [s.newCourses.length + " uutta kurssia", s.newTasks.length + " uutta tehtävää"];
+      if (s.errors && s.errors.length) parts.push(s.errors.length + " virhettä");
+      statusEl.textContent = parts.join(", ") + ".";
+      statusEl.className = "sync-status " + (s.errors && s.errors.length ? "sync-error" : "sync-ok");
+
+      if (s.changed) {
+        let detail = "";
+        if (s.newCourses.length) {
+          detail += "Uudet kurssit:\n" + s.newCourses.map((c) => "- " + c.name).join("\n") + "\n\n";
+        }
+        if (s.newTasks.length) {
+          detail +=
+            "Uudet tehtävät:\n" +
+            s.newTasks.map((t) => "- [" + t.courseName + "] " + t.title + " (" + t.date + ")").join("\n");
+        }
+        if (detail.trim()) alert(detail.trim());
+        location.reload();
+      } else {
+        btn.disabled = false;
+      }
+    } catch (err) {
+      statusEl.textContent = "Virhe: " + err.message;
+      statusEl.className = "sync-status sync-error";
+      btn.disabled = false;
+    }
+  };
+
+  // "Vie Google-kalenteriin" -nappi: kutsuu server.js:n /api/sync-google-
+  // reittiä (ajaa sync_to_google.js:n käyttäjän omalla koneella, jolla on netti
+  // Googleen - tämä EI toimi jos dashboardia katsotaan suoraan tiedostona
+  // tai jostain muusta kuin server.js:n kautta). Vie deadlinet nykyisellä
+  // jaolla: tehtävät Google Tasksiin, tentit/labrat/muut Google Calendariin.
+  // Jos kirjautuminen on vanhentunut, koneelle saattaa avautua selain
+  // kirjautumista varten - pyyntö voi silloin kestää kunnes se tehdään.
+  const SYNC_GOOGLE_LAST_RUN_KEY = "opintodashboard_last_google_sync_v1";
+
+  (function showLastGoogleSyncTime() {
+    let iso = null;
+    try { iso = localStorage.getItem(SYNC_GOOGLE_LAST_RUN_KEY); } catch (e) {}
+    if (iso) {
+      document.getElementById("syncGoogleStatus").textContent = "Viimeksi viety " + formatSyncTimestamp(iso);
+    }
+  })();
+
+  document.getElementById("syncGoogleBtn").onclick = async () => {
+    const btn = document.getElementById("syncGoogleBtn");
+    const statusEl = document.getElementById("syncGoogleStatus");
+    btn.disabled = true;
+    statusEl.className = "sync-status";
+    statusEl.textContent = "Viedään Google-kalenteriin... (selain saattaa avautua kirjautumista varten)";
+
+    try {
+      const res = await fetch("/api/sync-google", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok || !body.ok) throw new Error(body.error || "HTTP " + res.status);
+
+      const s = body.summary;
+      try { localStorage.setItem(SYNC_GOOGLE_LAST_RUN_KEY, new Date().toISOString()); } catch (e) {}
+
+      statusEl.textContent = `Luotu ${s.created}, päivitetty ${s.updated}, ennallaan ${s.skipped}.`;
+      statusEl.className = "sync-status sync-ok";
+    } catch (err) {
+      statusEl.textContent = "Virhe: " + err.message;
+      statusEl.className = "sync-status sync-error";
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  document.getElementById("navAsetukset").onclick = (e) => {
+    e.preventDefault();
+    location.hash = "#asetukset";
+    route();
+  };
+
+  document.getElementById("settingsSaveBtn").onclick = async () => {
+    const setValues = {};
+    let anyChange = false;
+    SETTINGS_GROUPS.forEach((g) =>
+      g.fields.forEach((f) => {
+        if (settingsClearPending.has(f.key)) {
+          anyChange = true;
+          return;
+        }
+        const el = document.getElementById("setField_" + f.key);
+        const val = el ? el.value.trim() : "";
+        if (val) {
+          setValues[f.key] = val;
+          anyChange = true;
+        }
+      })
+    );
+    const clearKeys = Array.from(settingsClearPending);
+    const statusEl = document.getElementById("settingsSaveStatus");
+    if (!anyChange) {
+      statusEl.textContent = "Ei muutoksia tallennettavaksi.";
+      statusEl.className = "settings-save-status";
+      return;
+    }
+    const btn = document.getElementById("settingsSaveBtn");
+    btn.disabled = true;
+    statusEl.textContent = "Tallennetaan...";
+    statusEl.className = "settings-save-status";
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ set: setValues, clear: clearKeys }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) throw new Error((body && body.error) || "HTTP " + res.status);
+      statusEl.textContent = "Tallennettu.";
+      statusEl.className = "settings-save-status ok";
+      settingsClearPending = new Set();
+      await loadSettingsStatus();
+      SETTINGS_GROUPS.forEach((g) =>
+        g.fields.forEach((f) => {
+          const el = document.getElementById("setField_" + f.key);
+          if (el) el.value = "";
+        })
+      );
+    } catch (err) {
+      statusEl.textContent = "Tallennus epäonnistui: " + err.message;
+      statusEl.className = "settings-save-status err";
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  document.getElementById("todayLine").textContent =
+    "Tänään " + today.toLocaleDateString("fi-FI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  route();
+})();
+</script>
+</body>
+</html>

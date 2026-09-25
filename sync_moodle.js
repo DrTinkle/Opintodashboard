@@ -1,0 +1,412 @@
+#!/usr/bin/env node
+// sync_moodle.js
+//
+// Kayy lapi kaikki Moodle-kurssisi ja:
+//   1) etsii kokonaan UUDET kurssit joita data.json:issa ei viela ole, ja
+//      lisaa ne sinne minimitiedoilla (nimi + moodleId), merkittyna
+//      "needsInfo": true kunnes taydennat opintopisteet/opettajan/
+//      alkamis-paattymispaivat kasin (dashboard nayttaa niista huomautuksen).
+//   2) paivittaa jokaisen kurssin sisaltorakenteen (topics, kuten
+//      scrape_course_content.js) jotta uudet aktiviteetit loytyvat.
+//   3) etsii jokaiselta tehtava/tentti-tyyppiselta (assign/quiz/workshop)
+//      aktiviteetilta sen oman "Due:"-paivamaaran ja lisaa siita UUDEN
+//      deadlinen data.json:iin jos sita ei jo ole (samalla epatarkalla
+//      otsikkotasmayksella kuin update_from_moodle.js kayttaa). Aktiviteetit
+//      joilta ei loydy selvaa "Due:"-riviä jatetaan ennalleen (niiden
+//      maaraaika pitaa paatella tekstista kasin, ks. find_deadlines.js).
+//
+// Kirjoittaa suoraan data.json:iin (ja paivittaa data.js:n build.js:n
+// logiikalla) - ei erillista tarkistusvaihetta, koska loydetyt kohteet voi
+// jalkikateen muokata/poistaa dashboardin omalla muokkaustyokalulla.
+//
+// Kaytto:
+//   node sync_moodle.js
+//   node sync_moodle.js --delay 800       (viive pyyntojen valissa ms, oletus 500)
+//   node sync_moodle.js --userid 12345    (oma Moodle-userid; oletus .env:n MOODLE_USERID)
+//
+// Tata kutsutaan myos server.js:n "/api/sync-moodle"-reitilta (dashboardin
+// "Hae uudet Moodlesta" -nappi), jolloin runSync()-funktiota kutsutaan
+// suoraan ilman komentorivia.
+
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+require("./load_env.js").loadEnvFile();
+
+const {
+  fetchMoodlePage,
+  scrapeCourseTopics,
+  decodeEntities,
+  BASE_URL,
+} = require("./scrape_course_content.js");
+const { extractCourseLinks, scoreMatch } = require("./find_moodle_ids.js");
+const {
+  extractActivityDates,
+  extractIntroDescription,
+  SCANNABLE_TYPES,
+} = require("./find_deadlines.js");
+const { estimateWithDeepSeek } = require("./estimate_deepseek.js");
+
+const DATA_JSON_PATH = path.join(__dirname, "data.json");
+const BUILD_JS_PATH = path.join(__dirname, "build.js");
+// Oma Moodle-käyttäjä-id luetaan .env:n MOODLE_USERID-kentästä (Asetukset-
+// välilehti) kutsuhetkellä, jotta Asetuksissa tehty muutos on heti voimassa.
+// Ei oletusarvoa, koska id on jokaisella eri.
+function defaultUserid() {
+  const v = Number(process.env.MOODLE_USERID);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+const MATCH_THRESHOLD = 40; // sama kynnys kuin find_moodle_ids.js:ssa
+
+// Varivaihtoehdot uusille kursseille - kierratetaan jarjestyksessa,
+// valttaen jo kaytossa olevia vareja (data.json:in nykyiset kurssit
+// kayttavat sinista/vihreaa/keltaista/punaista/violettia/pinkkia/syaania).
+const COLOR_PALETTE = [
+  "#14b8a6", "#f97316", "#6366f1", "#84cc16", "#d946ef",
+  "#0ea5e9", "#eab308", "#f43f5e", "#22c55e", "#a855f7",
+];
+
+function pickUnusedColor(data) {
+  const used = new Set(data.map((c) => (c.color || "").toLowerCase()));
+  const free = COLOR_PALETTE.find((c) => !used.has(c.toLowerCase()));
+  return free || COLOR_PALETTE[data.length % COLOR_PALETTE.length];
+}
+
+function slugify(name, existingIds) {
+  let base = decodeEntities(name)
+    .toLowerCase()
+    .replace(/ä/g, "a")
+    .replace(/ö/g, "o")
+    .replace(/å/g, "a")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  if (!base) base = "kurssi";
+  let id = base;
+  let n = 2;
+  while (existingIds.has(id)) {
+    id = base + "-" + n;
+    n++;
+  }
+  return id;
+}
+
+const MONTHS_EN = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+// Moodlen "activity-dates"-lohko on muotoa esim.
+// "Opened: Monday, 31 August 2026, 1:00 AM\n\nDue: Wednesday, 14 October
+// 2026, 11:59 PM" - aina englanniksi vaikka sivun muu sisalto on suomeksi
+// (ks. muistiinpanot find_deadlines.js:sta). Poimitaan vain "Due:"-rivi,
+// koska se on se paivamaara jota dashboard seuraa (ei "Opened:").
+function parseDueDate(activityDatesText) {
+  if (!activityDatesText) return null;
+  const m = activityDatesText.match(/\bDue\s*:\s*[A-Za-z]+,\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = MONTHS_EN[m[2].toLowerCase()];
+  const year = Number(m[3]);
+  if (!month || !day || !year) return null;
+  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+}
+
+// Sama periaate kuin update_from_moodle.js:n isSameDeadline/significantWords
+// (kopioitu tanne pienena, itsenaisena versiona, koska update_from_moodle.js
+// ei ole turvallinen requirettaa - se ajaa oman main()-funktionsa heti
+// tiedoston latautuessa eika odota require.main-tarkistusta).
+const GENERIC_WORDS = new Set([
+  "on", "ja", "tai", "ei", "jos", "niin", "että", "joka", "jotka", "tästä",
+  "tämä", "sen", "kuin", "yhtenä", "sekä", "sitä", "voi", "vielä", "kaikki",
+  "pakollinen", "palautettava", "viimeistään", "avautuu", "sulkeutuu",
+  "tehtävä", "asennus", "maininta", "näytönkaappaus", "ongelmasta",
+  "liittyvät", "löydy", "toimivaa", "region", "määrittelyä", "pdf",
+  "tiedostona", "tehtävän", "palautus", "palatuksen",
+  "harjoitus", "harjoitukset", "harjoitustehtävä", "viikkotehtävä",
+]);
+
+function significantWords(title) {
+  return title
+    .toLowerCase()
+    .replace(/[()"“”,.:;\-–]/g, " ")
+    .split(/\s+/)
+    // Lyhyet sanat (pituus <= 2) karsitaan roskana, MUTTA pelkka numero
+    // pidetaan aina, vaikka olisi lyhyt - "Viikkotehtava 1" vs "Viikkotehtava
+    // 2" -tyyppisissa otsikoissa numero on ainoa erottava tieto, ja
+    // "viikkotehtava" on omassa GENERIC_WORDS-listassa. Ilman tata poikkeusta
+    // significantWords("Viikkotehtava 1") palautti tyhjan listan, jolloin
+    // isSameDeadline ei koskaan tunnistanut tehtavaa edes itsekseen ja sama
+    // tehtava tuplaantui data.json:iin joka skannauskerralla.
+    .filter((w) => (w.length > 2 || /^\d+$/.test(w)) && !GENERIC_WORDS.has(w));
+}
+
+function isSameDeadline(existingTitle, incomingTitle) {
+  const existingWords = new Set(significantWords(existingTitle));
+  const incomingWords = significantWords(incomingTitle);
+  return incomingWords.some((w) => existingWords.has(w));
+}
+
+function guessDeadlineType(item, course) {
+  const lower = item.title.toLowerCase();
+  if (
+    lower.includes("tentti") ||
+    lower.includes("exam") ||
+    lower.includes("koe") ||
+    lower.includes("valitentti") ||
+    lower.includes("loppukoe")
+  ) {
+    return "exam";
+  }
+  if (course.id === "fyslab" || lower.includes("labra")) return "lab";
+  return "task";
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Etsii Moodle-profiilisivulta kaikki kurssit, taydentaa puuttuvat
+// moodleId:t olemassa oleville data.json-kursseille (sama logiikka kuin
+// find_moodle_ids.js), ja lisaa AIDOSTI uudet (ei tasmaa mihinkaan
+// olemassa olevaan kurssiin edes valttavasti) kurssit data.json:iin
+// minimitiedoilla. Mutatoi `data`-taulukkoa suoraan.
+async function discoverAndAddNewCourses(data, session, baseUrl, opts) {
+  const userid = opts.userid || defaultUserid();
+  if (!userid) {
+    return {
+      newCourses: [],
+      error:
+        "Uusien kurssien haku ohitettiin: oma Moodle-käyttäjä-id puuttuu. " +
+        "Aseta se Asetukset-välilehdellä (MOODLE_USERID). Olemassa olevien " +
+        "kurssien tehtävät haettiin silti normaalisti.",
+    };
+  }
+  const url = `${baseUrl}/user/profile.php?id=${userid}&showallcourses=1`;
+  let html;
+  try {
+    html = await fetchMoodlePage(url, session);
+  } catch (err) {
+    return { newCourses: [], error: "Kurssilistan haku epäonnistui: " + err.message };
+  }
+
+  const discovered = extractCourseLinks(html);
+  const usedIds = new Set(data.filter((c) => c.moodleId).map((c) => c.moodleId));
+  const existingIds = new Set(data.map((c) => c.id));
+  const newCourses = [];
+
+  // 1) Taydenna puuttuvat moodleId:t olemassa oleville kursseille.
+  data.forEach((course) => {
+    if (course.moodleId) return;
+    let best = { id: null, score: 0 };
+    discovered.forEach((labels, id) => {
+      if (usedIds.has(id)) return;
+      labels.forEach((label) => {
+        const score = scoreMatch(course, label);
+        if (score > best.score) best = { id, score };
+      });
+    });
+    if (best.score >= MATCH_THRESHOLD) {
+      course.moodleId = best.id;
+      usedIds.add(best.id);
+    }
+  });
+
+  // 2) Loput loydetyt kurssit joita ei voi tasmayttaa mihinkaan olemassa
+  //    olevaan (ei jo kaytossa, eika riittavan hyvaa nimitasmaytysta) ovat
+  //    aidosti uusia.
+  discovered.forEach((labels, id) => {
+    if (usedIds.has(id)) return;
+    let bestNameScore = 0;
+    data.forEach((course) => {
+      labels.forEach((label) => {
+        const score = scoreMatch(course, label);
+        if (score > bestNameScore) bestNameScore = score;
+      });
+    });
+    if (bestNameScore >= MATCH_THRESHOLD) return;
+
+    const label = Array.from(labels).sort((a, b) => b.length - a.length)[0];
+    const newId = slugify(label, existingIds);
+    existingIds.add(newId);
+    const course = {
+      id: newId,
+      name: label,
+      code: null,
+      credits: null,
+      teacher: null,
+      color: pickUnusedColor(data),
+      start: null,
+      end: null,
+      moodleId: id,
+      links: [{ label: "Moodle", url: `${baseUrl}/course/view.php?id=${id}` }],
+      deadlines: [],
+      needsInfo: true,
+    };
+    data.push(course);
+    usedIds.add(id);
+    newCourses.push({ id: newId, name: label, moodleId: id });
+  });
+
+  return { newCourses };
+}
+
+// Paivittaa yhden kurssin topics-kentan (uudet aktiviteetit mukaan) ja
+// etsii sen assign/quiz/workshop-aktiviteeteilta uudet deadlinet joilla on
+// selva "Due:"-paivamaara. Mutatoi course-oliota suoraan ja tayttaa
+// summary-oliota.
+async function scanCourseForNewDeadlines(course, session, baseUrl, opts, summary) {
+  let baseHtml;
+  try {
+    baseHtml = await fetchMoodlePage(`${baseUrl}/course/view.php?id=${course.moodleId}`, session);
+  } catch (err) {
+    summary.errors.push(`[${course.id}] kurssisivun haku epäonnistui: ${err.message}`);
+    return;
+  }
+
+  let topics;
+  try {
+    topics = await scrapeCourseTopics(course, baseHtml, session, baseUrl, { debug: false, delay: opts.delay });
+  } catch (err) {
+    summary.errors.push(`[${course.id}] sisällön jäsennys epäonnistui: ${err.message}`);
+    return;
+  }
+  course.topics = topics;
+  summary.coursesScanned++;
+
+  course.deadlines = course.deadlines || [];
+
+  for (const topic of topics) {
+    for (const item of topic.items || []) {
+      if (!SCANNABLE_TYPES.has(item.type) || !item.url) continue;
+      summary.activitiesScanned++;
+
+      let html;
+      try {
+        html = await fetchMoodlePage(item.url, session);
+      } catch (err) {
+        summary.errors.push(`[${course.id}] "${item.title}": ${err.message}`);
+        continue;
+      }
+      await sleep(opts.delay);
+
+      const isoDate = parseDueDate(extractActivityDates(html));
+      if (!isoDate) continue; // ei selvaa maaraaikaa, jatetaan kasin tarkistettavaksi
+
+      const alreadyExists = course.deadlines.some(
+        (d) => d.date === isoDate && isSameDeadline(d.title, item.title)
+      );
+      if (alreadyExists) continue;
+
+      const introText = extractIntroDescription(html);
+      const newDeadline = {
+        title: item.title,
+        date: isoDate,
+        type: guessDeadlineType(item, course),
+        notes: introText ? introText.slice(0, 500) : "",
+      };
+      // DeepSeek-aika-arvio VAIN aidosti uudelle tehtavalle (ei koskaan jo
+      // tunnetuille - alreadyExists-tarkistus yllakin sen varmistaa), jotta
+      // API-kutsuja ei tuhlata joka skannauskerralla samoihin tehtaviin.
+      // Epaonnistuminen (puuttuva avain, verkkovirhe, jarjeton vastaus) ei
+      // koskaan kaada skannausta - tehtava lisataan silti ilman arviota.
+      const estimate = await estimateWithDeepSeek(course, newDeadline);
+      if (estimate) {
+        newDeadline.estimatedHours = estimate.estimatedHours;
+        newDeadline.estimatedPace = estimate.estimatedPace;
+      }
+      course.deadlines.push(newDeadline);
+      summary.newTasks.push({
+        course: course.id,
+        courseName: course.name,
+        title: item.title,
+        date: isoDate,
+      });
+    }
+  }
+}
+
+async function runSync(opts = {}) {
+  opts = { delay: 500, userid: defaultUserid(), baseUrl: BASE_URL, ...opts };
+  const summary = {
+    newCourses: [],
+    newTasks: [],
+    coursesScanned: 0,
+    activitiesScanned: 0,
+    errors: [],
+    changed: false,
+  };
+
+  let session = process.env.MOODLE_SESSION || null;
+  if (process.env.MOODLE_USERNAME && process.env.MOODLE_PASSWORD) {
+    const { ensureFreshSession } = require("./refresh_moodle_session.js");
+    const result = await ensureFreshSession(session);
+    if (result.session) session = result.session;
+  }
+  if (!session) {
+    throw new Error(
+      "MoodleSession puuttuu. Aseta MOODLE_SESSION tai MOODLE_USERNAME+MOODLE_PASSWORD .env-tiedostoon (ks. .env.example)."
+    );
+  }
+
+  const data = JSON.parse(fs.readFileSync(DATA_JSON_PATH, "utf8"));
+
+  const courseResult = await discoverAndAddNewCourses(data, session, opts.baseUrl, opts);
+  if (courseResult.error) summary.errors.push(courseResult.error);
+  summary.newCourses = courseResult.newCourses || [];
+
+  const scannable = data.filter((c) => c.moodleId);
+  for (let i = 0; i < scannable.length; i++) {
+    await scanCourseForNewDeadlines(scannable[i], session, opts.baseUrl, opts, summary);
+    if (i < scannable.length - 1) await sleep(opts.delay);
+  }
+
+  data.forEach((c) => {
+    if (c.deadlines) c.deadlines.sort((a, b) => a.date.localeCompare(b.date));
+  });
+
+  summary.changed = summary.newCourses.length > 0 || summary.newTasks.length > 0;
+  if (summary.changed) {
+    fs.writeFileSync(DATA_JSON_PATH, JSON.stringify(data, null, 2) + "\n", "utf8");
+    execSync(`node ${JSON.stringify(BUILD_JS_PATH)}`, { stdio: "inherit" });
+  }
+
+  return summary;
+}
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const out = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--delay") out.delay = Number(args[++i]);
+    else if (args[i] === "--userid") out.userid = Number(args[++i]);
+  }
+  return out;
+}
+
+module.exports = { runSync, parseDueDate, slugify, pickUnusedColor, isSameDeadline, guessDeadlineType };
+
+if (require.main === module) {
+  runSync(parseArgs())
+    .then((summary) => {
+      console.log("\nValmis.");
+      console.log(`Uusia kursseja: ${summary.newCourses.length}`);
+      summary.newCourses.forEach((c) =>
+        console.log(`  + [${c.id}] ${c.name} (moodleId ${c.moodleId}) - täydennä tiedot data.json:iin`)
+      );
+      console.log(`Uusia tehtäviä: ${summary.newTasks.length}`);
+      summary.newTasks.forEach((t) => console.log(`  + [${t.course}] ${t.title} (${t.date})`));
+      console.log(`Kursseja skannattu: ${summary.coursesScanned}, aktiviteetteja tarkistettu: ${summary.activitiesScanned}`);
+      if (summary.errors.length) {
+        console.log(`\nVirheitä (${summary.errors.length}):`);
+        summary.errors.forEach((e) => console.log("  ! " + e));
+      }
+      console.log(summary.changed ? "\ndata.json ja data.js päivitetty." : "\nEi muutoksia.");
+    })
+    .catch((err) => {
+      console.error("Odottamaton virhe:", err);
+      process.exit(1);
+    });
+}

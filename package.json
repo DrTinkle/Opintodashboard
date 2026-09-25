@@ -1,0 +1,18 @@
+{
+  "name": "opintodashboard",
+  "version": "1.0.0",
+  "description": "Paikallinen opintodashboard SAMKin Moodlelle: deadlinet, kalenteri, viikkosuunnitelma ja vienti Google-kalenteriin.",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node server.js",
+    "build": "node build.js",
+    "sync:moodle": "node sync_moodle.js",
+    "sync:google": "node sync_to_google.js",
+    "find-ids": "node find_moodle_ids.js"
+  }
+}
