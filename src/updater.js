@@ -3,8 +3,11 @@
 // Päivitysten tarkistus ja asennus GitHubista.
 //
 // - Tarkistus: verrataan oman package.json:n versiota GitHubin main-haaran
-//   package.json:n versioon (raw.githubusercontent.com). Tulos pidetään
-//   muistissa 30 minuuttia, jottei GitHubia kuormiteta joka sivulatauksella.
+//   package.json:n versioon (raw.githubusercontent.com). Käyttöliittymä
+//   tarkistaa aina sivun latautuessa (?force=1, ohittaa välimuistin).
+//   Tulos pidetään muistissa 5 minuuttia muita kyselyjä varten (esim.
+//   päivityksen jälkeinen uudelleenkäynnistyksen odotus kyselee sekunnin
+//   välein), jottei GitHubia kuormiteta turhaan.
 // - Asennus:
 //     * git-kloonissa `git pull --ff-only` (ei yhdistä paikallisia
 //       muutoksia väkisin, vaan kertoo niistä virheenä)
@@ -28,7 +31,7 @@ const BRANCH = "main";
 const REPO_URL = `https://github.com/${REPO}`;
 const REMOTE_PACKAGE_URL = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/package.json`;
 const ARCHIVE_URL = `https://codeload.github.com/${REPO}/tar.gz/refs/heads/${BRANCH}`;
-const CHECK_CACHE_MS = 30 * 60 * 1000;
+const CHECK_CACHE_MS = 5 * 60 * 1000;
 const TIMEOUT_MS = 10000;
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 

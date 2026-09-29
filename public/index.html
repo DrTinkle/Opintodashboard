@@ -4481,10 +4481,12 @@
     setTimeout(poll, 1500);
   }
 
+  // Tarkistus aina sivun latautuessa (käynnistys tai uudelleenlataus).
+  // force=1 ohittaa palvelimen välimuistin, jotta uusi versio näkyy heti.
   async function checkForUpdates() {
     if (!/^https?:$/.test(location.protocol)) return; // avattu tiedostona, ei palvelinta
     try {
-      const res = await fetch("/api/version");
+      const res = await fetch("/api/version?force=1");
       const info = await res.json();
       if (!info.ok) return;
       document.getElementById("appVersion").textContent = "Opintodashboard " + info.current;

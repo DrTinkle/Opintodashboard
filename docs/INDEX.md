@@ -188,7 +188,7 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `POST /api/sync-google` | Ajaa `sync_to_google.js`:n `main()`:n oletusasetuksilla (komentoriviliput eivät vaikuta) |
 | `GET /api/settings/status` | Kertoo vain, onko kukin asetus asetettu (`true`/`false`). Arvoja ei koskaan palauteta. |
 | `POST /api/settings` | `{ set: {KEY: arvo}, clear: [KEY] }`. Kirjoittaa vain muuttuneet rivit `.env`:iin ja päivittää käynnissä olevan palvelimen `process.env`:n. |
-| `GET /api/version` | Oma versio (`package.json`) ja GitHubin main-haaran versio, `updateAvailable`. GitHub-tulos välimuistissa 30 min (`?force=1` ohittaa). |
+| `GET /api/version` | Oma versio (`package.json`) ja GitHubin main-haaran versio, `updateAvailable`. GitHub-tulos välimuistissa 5 min (`?force=1` ohittaa). Käyttöliittymä tarkistaa jokaisella sivun latauksella `?force=1`:llä. |
 | `POST /api/update` | Asentaa päivityksen (`updater.js`): git-kloonissa `git pull --ff-only`, muuten main-haaran tar.gz kansion päälle (ei `data/`, `.env`, `debug/`, `public/data.js`; vain muuttuneet tiedostot). Ajaa uuden `setup.js`:n ja käynnistää palvelimen uudelleen. |
 
 **Uudelleenkäynnistys päivityksen jälkeen:** vanha palvelinprosessi sulkee
