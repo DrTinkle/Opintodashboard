@@ -178,6 +178,7 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `capacity_v1` | Viikkonäkymän opiskeluaika viikonpäivittäin |
 | `nostudy_v1` | "Ei opiskella" -päivät |
 | `weekplan_v1` | Viikkosuunnitelman päiväkohtaiset tilannekuvat (`{päivä: [{k, h, title, course, color}]}`), 180 päivää |
+| `weeklock_v1` | Lukitut viikot (`{maanantai: lukituspäivä}`), 180 päivää |
 | `last_sync_v1`, `last_google_sync_v1` | Viimeisimmän synkan aikaleima |
 
 ## Palvelimen API
@@ -287,6 +288,17 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     Menneet päivät näytetään tilannekuvasta, joten ne eivät muutu päivän
     vaihtuessa. Jos tehtävän työtä ei merkitä (valmiina %), sen tunnit
     suunnitellaan uudelleen tuleville päiville.
+  - **Viikon lukitus** (`lockCurrentWeek()` / `unlockCurrentWeek()`,
+    `weeklock_v1`): lukittaessa kuluvan viikon suunnitelma tästä päivästä
+    sunnuntaihin tallennetaan `weekplan_v1`:een ja näytetään siitä. Tehdyksi
+    merkitty tehtävä jää paikalleen yliviivattuna, eikä seuraava siirry
+    tilalle. Opiskeluajan tai "Ei opiskella" -merkinnän muutos laskee
+    lukitut päivät uudelleen niin, että tehdyt tehtävät pysyvät paikallaan
+    ja vievät osansa päivän kapasiteetista (`opts.usedCap`). Lukitun viikon
+    jälkeiset viikot lasketaan seuraavasta maanantaista, ja lukitulle
+    viikolle varatut tunnit vähennetään jäljellä olevasta työstä
+    (`opts.preUsed`). Lukituksen avaus poistaa tulevien päivien
+    tilannekuvat.
 - **EXAM-varattavuus:** ajat avautuvat noin 30 vrk etukäteen
   (`EXAM_BOOKING_HORIZON_DAYS`).
 

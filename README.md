@@ -126,6 +126,9 @@ uudelleen.
   viikossa enintään tahtinsa (h/vko) verran tunteja. Menneet päivät
   jäävät näkyviin sellaisina kuin ne suunniteltiin. Kun merkitset Työn
   alla -tehtävälle valmiusprosentin, jäljellä olevat tunnit pienenevät.
+  **Lukitse viikko** pitää viikon suunnitelman samana: tehdyksi merkitty
+  tehtävä jää paikalleen yliviivattuna, eikä seuraava tehtävä siirry
+  tilalle. **Avaa lukitus** palauttaa ajantasaisen suunnitelman.
 - **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja
   tehtävää tarkistettiin ja montako määräaikaa Moodlesta löytyi. Vie hiiri
   tekstin päälle nähdäksesi erittelyn kursseittain.
