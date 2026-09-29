@@ -14,7 +14,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
 
 const { PUBLIC_DIR, ENV_PATH, migrateLegacyFiles } = require("./paths.js");
 const { readEnvFile } = require("./load_env.js");
@@ -25,9 +25,10 @@ const ROOT = PUBLIC_DIR;
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const out = { port: 8080 };
+  const out = { port: 8080, open: true };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--port") out.port = Number(args[++i]);
+    else if (args[i] === "--no-open") out.open = false;
   }
   return out;
 }
@@ -423,11 +424,73 @@ function serveStatic(req, res) {
   });
 }
 
+// --- Päivitykset (ks. updater.js) ---
+//
+// GET /api/version kertoo oman ja GitHubin uusimman version. POST
+// /api/update asentaa päivityksen ja käynnistää palvelimen uudelleen
+// (restartServer): vanha prosessi sulkee porttinsa ja käynnistää uuden
+// palvelinprosessin samaan komentoikkunaan, ja jää odottamaan sitä. Näin
+// kaynnista.bat:n ei tarvitse tehdä mitään, eikä selaimeen avata uutta
+// välilehteä (--no-open); sivu latautuu itse uudelleen.
+let isUpdating = false;
+const activeServers = [];
+
+async function handleVersionRequest(req, res) {
+  const force = /[?&]force=1\b/.test(req.url || "");
+  const info = await require("./updater.js").checkForUpdate({ force });
+  sendJson(res, 200, { ok: true, ...info });
+}
+
+async function handleUpdateRequest(req, res) {
+  if (isUpdating || isSyncing || isSyncingGoogle) {
+    sendJson(res, 409, { ok: false, error: "Synkka tai päivitys on käynnissä, yritä hetken päästä uudelleen." });
+    return;
+  }
+  isUpdating = true;
+  console.log("Päivitetään Opintodashboard GitHubista...");
+  try {
+    const result = await require("./updater.js").runUpdate();
+    console.log(`Päivitetty: ${result.from} -> ${result.to} (${result.method}).`);
+    sendJson(res, 200, { ok: true, ...result, restarting: true });
+    setTimeout(restartServer, 300);
+  } catch (err) {
+    isUpdating = false;
+    console.error("Päivitys epäonnistui:", err.message);
+    sendJson(res, 500, { ok: false, error: err.message });
+  }
+}
+
+function restartServer() {
+  console.log("Käynnistetään palvelin uudelleen päivitettynä...");
+  let pending = activeServers.length;
+  const startNew = () => {
+    if (--pending > 0) return;
+    const args = process.argv.slice(2).filter((a) => a !== "--no-open");
+    const child = spawn(process.execPath, [...process.execArgv, __filename, ...args, "--no-open"], {
+      stdio: "inherit",
+      cwd: process.cwd(),
+      env: process.env,
+    });
+    child.on("exit", (code) => process.exit(code == null ? 0 : code));
+  };
+  if (!pending) {
+    pending = 1;
+    startNew();
+    return;
+  }
+  activeServers.forEach((srv) => {
+    srv.close(() => startNew());
+    if (srv.closeAllConnections) srv.closeAllConnections();
+  });
+}
+
 const API_ROUTES = {
   "POST /api/sync-moodle": handleSyncRequest,
   "POST /api/sync-google": handleSyncGoogleRequest,
   "GET /api/settings/status": handleSettingsStatusRequest,
   "POST /api/settings": handleSettingsSaveRequest,
+  "GET /api/version": handleVersionRequest,
+  "POST /api/update": handleUpdateRequest,
 };
 
 function handleRequest(req, res, port) {
@@ -460,7 +523,7 @@ function handleRequest(req, res, port) {
 
 function main() {
   prepareFiles();
-  const { port } = parseArgs();
+  const { port, open } = parseArgs();
 
   const handler = (req, res) => {
     try {
@@ -516,16 +579,17 @@ function main() {
   });
 
   server.listen(port, "127.0.0.1", () => {
+    activeServers.push(server);
     const server6 = createServer();
     server6.on("error", () => {
       /* ei IPv6:ta tai ::1 varattu: IPv4 riittää */
     });
-    server6.listen(port, "::1");
+    server6.listen(port, "::1", () => activeServers.push(server6));
 
     const url = `http://localhost:${port}`;
     console.log(`Opintodashboard käynnissä osoitteessa ${url}`);
     console.log("Pysäytä palvelin Ctrl+C:llä.");
-    openInBrowser(url);
+    if (open) openInBrowser(url);
   });
 }
 

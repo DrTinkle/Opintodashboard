@@ -118,6 +118,16 @@ Ennen committia:
 5. Moodle-synkan muutokset: aja synkka ja tarkista `data/sync_report.json`,
    jossa näkyy jokainen löydetty tehtävä ja mihin se täsmättiin.
 
+## Versiot ja julkaisu
+
+- Nosta `package.json`:n `version` (semver) jokaisessa muutoksessa, joka
+  julkaistaan GitHubiin muille: korjaus `1.1.0 -> 1.1.1`, uusi ominaisuus
+  `1.1.0 -> 1.2.0`. Dashboard vertaa omaa versiotaan GitHubin main-haaran
+  versioon, joten ilman nostoa muut eivät saa päivitysilmoitusta.
+- Päivitys (`src/updater.js`) kirjoittaa kaikki repon tiedostot paitsi
+  käyttäjän omat (`data/`, `.env`, `debug/`, `public/data.js`). Älä lisää
+  repoon tiedostoja, joihin käyttäjä kirjoittaa omia tietojaan.
+
 ## Dokumentaatio
 
 - `README.md` on lyhyt käyttöohje luokkalaisille. Pidä se lyhyenä.

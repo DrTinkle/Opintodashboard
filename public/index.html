@@ -236,6 +236,15 @@
   .sync-status.sync-error { color: var(--danger); font-weight: 600; }
   .sync-status.sync-ok { color: var(--ok); font-weight: 600; }
   .sync-status.sync-warn { color: var(--warn); font-weight: 600; }
+  /* Päivitysilmoitus: pieni teksti ja nappi tilarivillä */
+  .update-notice { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 600; }
+  .update-notice.sync-error { color: var(--danger); }
+  .update-notice button {
+    height: 22px; padding: 0 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .update-notice button:disabled { opacity: 0.6; cursor: default; }
+  .update-notice a { color: inherit; font-weight: 500; }
 
   /* ==========================================================================
      Otsikot, osiot, ohjelaatikot
@@ -1144,6 +1153,7 @@
   <div class="sync-statusbar" aria-live="polite">
     <span class="sync-status" id="syncStatus"></span>
     <span class="sync-status" id="syncGoogleStatus"></span>
+    <span class="sync-status update-notice" id="updateNotice"></span>
   </div>
 
   <div id="dashboardView">
@@ -1335,7 +1345,7 @@
   </div>
 
   <footer>
-    <span>Opintodashboard</span>
+    <span id="appVersion">Opintodashboard</span>
     <span>Kurssidata tulee data/data.json-tiedostosta. Tilat, arviot ja EXAM-tiedot tallentuvat tämän selaimen muistiin eivätkä synkronoidu laitteiden välillä.</span>
   </footer>
 </div>
@@ -4404,8 +4414,89 @@
   document.getElementById("todayLine").textContent =
     "Tänään " + today.toLocaleDateString("fi-FI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // --- Päivitysilmoitus ---
+  // Palvelin vertaa omaa versiota GitHubin uusimpaan (/api/version). Jos uusi
+  // on saatavilla, tilarivillä näkyy pieni ilmoitus ja Päivitä-nappi, joka
+  // asentaa päivityksen (/api/update). Palvelin käynnistyy uudelleen, ja sivu
+  // latautuu itse, kun uusi versio vastaa.
+  function renderUpdateNotice(info) {
+    const el = document.getElementById("updateNotice");
+    el.textContent = "";
+    el.className = "sync-status update-notice";
+    if (!info || !info.updateAvailable) return;
+    el.appendChild(document.createTextNode("Uusi versio " + info.latest + " saatavilla"));
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Päivitä";
+    btn.title = "Lataa ja asenna uusi versio GitHubista. Omat tietosi säilyvät.";
+    btn.onclick = () => installUpdate(btn);
+    el.appendChild(btn);
+    if (info.repoUrl) {
+      const link = document.createElement("a");
+      link.href = info.repoUrl + "/commits/main";
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "Mitä uutta?";
+      el.appendChild(link);
+    }
+  }
+
+  function setUpdateMessage(text, isError) {
+    const el = document.getElementById("updateNotice");
+    el.textContent = text;
+    el.className = "sync-status update-notice" + (isError ? " sync-error" : "");
+  }
+
+  async function installUpdate(btn) {
+    btn.disabled = true;
+    btn.textContent = "Päivitetään...";
+    let result;
+    try {
+      const res = await fetch("/api/update", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      result = await res.json();
+      if (!res.ok || !result.ok) throw new Error((result && result.error) || "HTTP " + res.status);
+    } catch (err) {
+      setUpdateMessage("Päivitys epäonnistui: " + err.message, true);
+      return;
+    }
+    setUpdateMessage("Päivitetty versioon " + result.to + ". Käynnistetään uudelleen...");
+    const started = Date.now();
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/version");
+        const info = await res.json();
+        if (info.ok && info.current === result.to) {
+          location.reload();
+          return;
+        }
+      } catch (e) {
+        /* palvelin käynnistyy vielä */
+      }
+      if (Date.now() - started > 45000) {
+        setUpdateMessage("Päivitetty versioon " + result.to + ". Käynnistä dashboard uudelleen.", false);
+        return;
+      }
+      setTimeout(poll, 1000);
+    };
+    setTimeout(poll, 1500);
+  }
+
+  async function checkForUpdates() {
+    if (!/^https?:$/.test(location.protocol)) return; // avattu tiedostona, ei palvelinta
+    try {
+      const res = await fetch("/api/version");
+      const info = await res.json();
+      if (!info.ok) return;
+      document.getElementById("appVersion").textContent = "Opintodashboard " + info.current;
+      renderUpdateNotice(info);
+    } catch (e) {
+      /* vanha palvelin tai ei verkkoa: ei ilmoitusta */
+    }
+  }
+
   recordTodayPlan();
   route();
+  setTimeout(checkForUpdates, 1500);
 })();
 </script>
 </body>

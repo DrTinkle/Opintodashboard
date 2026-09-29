@@ -67,6 +67,13 @@ npm-asennuksia.
 
 ## Päivitys
 
+Dashboard tarkistaa itse, onko GitHubissa uudempi versio. Jos on, sivun
+yläosaan tulee pieni ilmoitus **Uusi versio saatavilla** ja **Päivitä**-nappi.
+Nappi lataa ja asentaa päivityksen, käynnistää dashboardin uudelleen ja
+lataa sivun. Nykyinen versio näkyy sivun alareunassa.
+
+Käsin päivitys:
+
 - **Windows:** tuplaklikkaa **Päivitä Opintodashboard** -kuvaketta tai
   `paivita.bat`-tiedostoa. Git-kloonissa se ajaa `git pull`, zipinä
   ladatussa kansiossa se lataa uusimman version GitHubista ja kopioi sen
@@ -75,8 +82,8 @@ npm-asennuksia.
   päälle.
 
 Omat asetuksesi (`.env`) ja tietosi (`data/`) säilyvät, koska ne eivät ole
-GitHubissa. Käynnistä dashboard päivityksen jälkeen uudelleen ja paina
-"Hae Moodlesta".
+GitHubissa. Käsin päivitettäessä käynnistä dashboard päivityksen jälkeen
+uudelleen.
 
 ## Ensimmäinen käyttökerta
 
