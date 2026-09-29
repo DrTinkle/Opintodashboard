@@ -368,23 +368,12 @@ async function scrapeCourseTopics(course, baseHtml, session, baseUrl, opts) {
   return topics;
 }
 
-// Moodle näyttää sivut istunnon tai tilin kieliasetuksen mukaan, eikä skripti
-// lähetä selaimen kieltä. Käyttäjästä riippuen sivut tulisivat siis joko
-// englanniksi ("Due: Tuesday, 6 October 2026") tai suomeksi, ja jäsennys
-// osaa vain englantia. Pyydetään siksi aina englanninkielinen sivu
-// (lang=en), jolloin muoto on kaikilla sama.
-function withEnglishLang(url) {
-  try {
-    const u = new URL(url);
-    if (!u.searchParams.has("lang")) u.searchParams.set("lang", "en");
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
+// Sivut haetaan käyttäjän omalla Moodle-kielellä (ei lang-parametria).
+// Jäsennys ymmärtää sekä englannin että suomen (ks. moodle_dates.js ja
+// exam_windows.js), koska käyttöliittymän kieli vaihtelee käyttäjittäin ja
+// kurssien sisältö on pääosin suomeksi.
 async function fetchMoodlePage(url, session) {
-  const res = await fetch(withEnglishLang(url), {
+  const res = await fetch(url, {
     redirect: "manual",
     headers: {
       Cookie: `MoodleSession=${session}`,

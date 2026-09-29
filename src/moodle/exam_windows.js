@@ -28,8 +28,8 @@
 const EXAM_LINK_RE = /https?:\/\/exam\w*\.samk\.fi\/[^\s)"]*/i;
 // "exam" omana sanana tai taivutettuna (Examissa, EXAM-tentti), ei "examples"
 const EXAM_WORD_RE = /\bexam(?:\b|issa|ista|iin|iä|ia|-)/i;
-const EXAM_CONTEXT_RE = /tentti|tentin|tenttiin|kuulustelu|välikoe|välikokee|loppukoe|loppukokee|\bexam(?:\b|issa|ista|iin|iä|ia|-)/i;
-const TITLE_RE = /(välitentti|lopputentti|välikoe|loppukoe)/gi;
+const EXAM_CONTEXT_RE = /tentti|tentin|tenttiin|kuulustelu|välikoe|välikokee|loppukoe|loppukokee|\bexam(?:\b|s\b|issa|ista|iin|iä|ia|-)|examination|midterm/i;
+const TITLE_RE = /(välitentti|lopputentti|välikoe|loppukoe|midterm|final exam)/gi;
 // Kontekstissa nämä tarkoittavat, ettei päivä ole itse tentti.
 const SKIP_RE = /uusinta|ilmoittau|registration|enrol|re-?exam|retake|palautu|palautus|deadline/i;
 // Yksittäinen päivä, joka kertoo vain avautumisesta, ei ole tentin päivä.

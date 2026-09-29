@@ -90,9 +90,10 @@ yksityiskohdat.
   `public/index.html`:n `describeSync()` kuuluvat yhteen. Jos muutat toista,
   päivitä toinen. "0 uutta" ei saa koskaan näyttää onnistumiselta, jos
   mitään ei oikeasti tarkistettu.
-- **Moodlen kieli:** hae Moodle-sivut aina `fetchMoodlePage()`:lla, joka
-  pakottaa englannin (`lang=en`). Jäsennys olettaa englanninkieliset
-  sivut; käyttäjien Moodle voi muuten olla suomeksi.
+- **Moodlen kieli:** sivut haetaan käyttäjän omalla kielellä, joten kaiken
+  jäsennyksen pitää ymmärtää sekä englantia että suomea (käyttöliittymä
+  voi olla kumpi tahansa, kurssien sisältö on pääosin suomeksi). Älä
+  pakota kieltä `lang`-parametrilla. Päivämäärät: `moodle_dates.js`.
 - **Windows:** käyttäjät ovat enimmäkseen Windowsilla. Älä käytä
   `cmd /c start`:ia URL:ien avaamiseen (katkaisee `&`-merkkiin), ja pidä
   `.bat`- ja `.ps1`-tiedostot CRLF-muodossa ja ASCII-merkeissä (Windows

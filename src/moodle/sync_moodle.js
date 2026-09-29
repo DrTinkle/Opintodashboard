@@ -96,33 +96,9 @@ function slugify(name, existingIds) {
   return id;
 }
 
-const MONTHS_EN = {
-  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-};
-
-// Moodlen "activity-dates"-lohko on muotoa esim.
-// "Opened: Monday, 31 August 2026, 1:00 AM\n\nDue: Wednesday, 14 October
-// 2026, 11:59 PM" (sivut haetaan aina englanniksi, ks. fetchMoodlePage).
-// Palautustehtävillä (assign) määräaika on "Due:". Aikaikkunallisilla
-// harjoituksilla ja tenteillä (quiz) sitä ei ole, vaan ikkuna sulkeutuu:
-// "Closes:" tai jo mennyt "Closed:". "Due:" ensin, sitten sulkeutuminen.
-// "Opened:"/"Opens:" ei ole määräaika.
-function dateAfterLabel(text, label) {
-  const re = new RegExp("\\b" + label + "\\s*:\\s*[A-Za-z]+,\\s*(\\d{1,2})\\s+([A-Za-z]+)\\s+(\\d{4})", "i");
-  return text.match(re);
-}
-
-function parseDueDate(activityDatesText) {
-  if (!activityDatesText) return null;
-  const m = dateAfterLabel(activityDatesText, "Due") || dateAfterLabel(activityDatesText, "Close[sd]?");
-  if (!m) return null;
-  const day = Number(m[1]);
-  const month = MONTHS_EN[m[2].toLowerCase()];
-  const year = Number(m[3]);
-  if (!month || !day || !year) return null;
-  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
-}
+// Päivämäärät luetaan kielestä riippumatta (englanti tai suomi), ks.
+// moodle_dates.js. Moodle-sivut haetaan käyttäjän omalla kielellä.
+const { parseDueDate } = require("./moodle_dates.js");
 
 // Sama periaate kuin update_from_moodle.js:n isSameDeadline/significantWords
 // (kopioitu tanne pienena, itsenaisena versiona, jotta synkka ei riipu
@@ -197,6 +173,7 @@ function guessDeadlineType(item, course) {
     lower.includes("exam") ||
     lower.includes("koe") ||
     lower.includes("valitentti") ||
+    lower.includes("midterm") ||
     lower.includes("loppukoe")
   ) {
     return "exam";

@@ -93,6 +93,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 | `src/moodle/update_from_moodle.js` | Deadlinet Moodlen kalenterin ICS-viennistä |
 | `src/moodle/scrape_course_content.js` | Kurssien aiheet ja materiaalit (`topics`), Moodle-sivujen haku |
 | `src/moodle/find_moodle_ids.js` | Täydentää kurssien `moodleId`:t profiilisivulta |
+| `src/moodle/moodle_dates.js` | Aktiviteettisivun päivämäärät englanniksi tai suomeksi |
 | `src/moodle/exam_windows.js` | Tentit kurssin Moodle-tekstistä: EXAM-ikkunat, paperi- ja luokkatentit (synkka käyttää) |
 | `src/moodle/find_deadlines.js` | Skannaa tehtävien/tenttien sivut tiedostoon `data/deadline_scan.json` tarkistettavaksi |
 | `src/moodle/refresh_moodle_session.js` | Automaattinen SAMK-kirjautuminen (Shibboleth), uusii `MOODLE_SESSION`:in |
@@ -305,10 +306,14 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   (`refresh_moodle_session.js`) käyttää väljempää tarkistusta. Jos
   automaattinen kirjautuminen epäonnistuu mutta tallennettu istunto on,
   synkka jatkaa sillä.
-- **Kieli:** Moodle näyttää sivut istunnon tai tilin kieliasetuksen mukaan
-  (skripti ei lähetä selaimen kieltä), joten `fetchMoodlePage()` lisää
-  jokaiseen pyyntöön `lang=en`. Näin sivut ovat kaikilla englanniksi, ja
-  jäsennys (päivämäärät, otsikot) toimii samoin kaikille.
+- **Kieli:** sivut haetaan käyttäjän omalla Moodle-kielellä, eikä kieltä
+  pakoteta. Jäsennys ymmärtää sekä englannin että suomen: käyttöliittymän
+  kieli vaihtelee käyttäjittäin, ja kurssien sisältö on pääosin suomeksi.
+  Päivämäärät luetaan `moodle_dates.js`:llä: rivin otsikko luokitellaan
+  avainsanoista (avautuminen / sulkeutuminen / määräaika, esim. "Due",
+  "Closes", "Määräpäivä", "Sulkeutuu", "Palautettava") ja päivä kuukauden
+  nimestä (englanti tai suomi, esim. "14. lokakuuta 2026") tai muodosta
+  14.10.2026.
 - **Deadlinet:** tehtäväsivun `data-region="activity-dates"` sisältää
   "Opened:"/"Due:"-rivit. Aikaikkunallisilla harjoituksilla ja tenteillä
   (quiz) määräaika on "Closes:" tai jo mennyt "Closed:", ja sitä käytetään,
