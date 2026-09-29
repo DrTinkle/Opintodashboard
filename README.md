@@ -68,9 +68,11 @@ npm-asennuksia.
 ## Päivitys
 
 Dashboard tarkistaa itse, onko GitHubissa uudempi versio. Jos on, sivun
-yläosaan tulee pieni ilmoitus **Uusi versio saatavilla** ja **Päivitä**-nappi.
-Nappi lataa ja asentaa päivityksen, käynnistää dashboardin uudelleen ja
-lataa sivun. Nykyinen versio näkyy sivun alareunassa.
+yläosaan tulee pieni ilmoitus **Uusi versio X saatavilla** ja
+**Päivitä**-nappi. Nappi lataa ja asentaa päivityksen, käynnistää
+dashboardin uudelleen ja lataa sivun. Nykyinen versio näkyy sivun
+alareunassa. Jos alareunassa ei näy versionumeroa, sinulla on vanha
+versio ilman päivitysnappia: päivitä kerran käsin alla olevalla tavalla.
 
 Käsin päivitys:
 
@@ -155,6 +157,8 @@ uudelleen.
   käytä pelkkää MoodleSession-evästettä.
 - Opinto-oppaan haut ovat julkisia eivätkä vaadi kirjautumista. Niissä
   lähetetään vain koulutusohjelman tunnus, ei henkilötietoja.
+- Päivitystarkistus hakee GitHubista vain uusimman versionumeron. Sinusta
+  ei lähetetä mitään.
 
 ## Kansiot
 
@@ -176,6 +180,9 @@ automaattisesti oikeisiin kansioihin.
   versioon (Päivitä Opintodashboard -kuvake tai `git pull`). Moodle voi
   olla suomeksi tai englanniksi. Jos ongelma jatkuu, lähetä tiedosto
   `data/sync_report.json` kehittäjälle.
+- **Päivitä-nappi antaa virheen:** päivitä käsin (Päivitä Opintodashboard
+  -kuvake tai `git pull`). Git-kloonissa syy on yleensä itse muokattu
+  tiedosto: `git status` näyttää mikä.
 - **"Portti 8080 on jo käytössä":** portissa on jokin muu ohjelma.
   Käynnistä toiseen porttiin: `npm start -- --port 3000`.
 - **Asetukset tai Hae Moodlesta eivät toimi:** avaa dashboard
