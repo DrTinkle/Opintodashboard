@@ -7,8 +7,11 @@
 // "Otsikko: päivämäärä", esimerkiksi
 //   englanniksi: "Due: Wednesday, 14 October 2026, 11:59 PM"
 //                "Closes: Sunday, 27 September 2026, 4:00 PM"
-//   suomeksi:    "Määräpäivä: keskiviikko, 14. lokakuuta 2026, 23.59"
-//                "Sulkeutuu: sunnuntai, 27. syyskuuta 2026, 16.00"
+//   suomeksi:    "Palautettavissa alkaen: maanantaina 31. elokuuta 2026, 00.00"
+//                "Palautettava viimeistään: keskiviikkona 14. lokakuuta 2026, 23.59"
+//                "Avautui: tiistaina 15. syyskuuta 2026, 14.15"
+//                "Sulkeutui: sunnuntai 27. syyskuuta 2026, 16.00"
+// (suomenkieliset esimerkit ovat SAMKin Moodlesta 29.9.2026)
 // Rivin otsikko luokitellaan avainsanoista (avautuminen, sulkeutuminen,
 // määräaika) ja päivämäärä luetaan joko kuukauden nimestä (englanti tai
 // suomi) tai numeromuodosta 14.10.2026. Näin jäsennys toimii, vaikka

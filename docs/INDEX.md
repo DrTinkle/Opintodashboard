@@ -310,8 +310,10 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   pakoteta. Jäsennys ymmärtää sekä englannin että suomen: käyttöliittymän
   kieli vaihtelee käyttäjittäin, ja kurssien sisältö on pääosin suomeksi.
   Päivämäärät luetaan `moodle_dates.js`:llä: rivin otsikko luokitellaan
-  avainsanoista (avautuminen / sulkeutuminen / määräaika, esim. "Due",
-  "Closes", "Määräpäivä", "Sulkeutuu", "Palautettava") ja päivä kuukauden
+  avainsanoista (avautuminen / sulkeutuminen / määräaika). SAMKin
+  Moodlessa otsikot ovat englanniksi "Opened/Opens", "Due", "Closed/Closes"
+  ja suomeksi "Palautettavissa alkaen", "Palautettava viimeistään",
+  "Avautui/Avautuu", "Sulkeutui/Sulkeutuu". Päivä luetaan kuukauden
   nimestä (englanti tai suomi, esim. "14. lokakuuta 2026") tai muodosta
   14.10.2026.
 - **Deadlinet:** tehtäväsivun `data-region="activity-dates"` sisältää
