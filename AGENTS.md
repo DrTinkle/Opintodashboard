@@ -120,9 +120,11 @@ Ennen committia:
 
 ## Versiot ja julkaisu
 
-- Nosta `package.json`:n `version` (semver) jokaisessa muutoksessa, joka
-  julkaistaan GitHubiin muille: korjaus `1.1.0 -> 1.1.1`, uusi ominaisuus
-  `1.1.0 -> 1.2.0`. Dashboard vertaa omaa versiotaan GitHubin main-haaran
+- Nosta `package.json`:n `version` jokaisessa sovellusta muuttavassa
+  muutoksessa, joka julkaistaan GitHubiin muille. Nosta aina vain
+  viimeistä numeroa (`1.2.0 -> 1.2.1 -> ... -> 1.2.100`), myös uusissa
+  ominaisuuksissa. Keskimmäistä numeroa nostetaan vain, kun ylläpitäjä
+  erikseen pyytää. Dashboard vertaa omaa versiotaan GitHubin main-haaran
   versioon, joten ilman nostoa muut eivät saa päivitysilmoitusta.
 - Päivitys (`src/updater.js`) kirjoittaa kaikki repon tiedostot paitsi
   käyttäjän omat (`data/`, `.env`, `debug/`, `public/data.js`). Älä lisää
