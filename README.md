@@ -165,6 +165,12 @@ automaattisesti oikeisiin kansioihin.
 
 ## Ongelmatilanteita
 
+- **Tehtäviä tulee, mutta päivämäärät puuttuvat:** päivitä ensin uusimpaan
+  versioon (Päivitä Opintodashboard -kuvake tai `git pull`). Jos ongelma
+  jatkuu, vaihda Moodlen kieleksi englanti (Moodlessa oma profiili >
+  Asetukset > Kieli) ja hae uudelleen. Skripti lukee päivämäärät
+  englanninkielisiltä sivuilta ja pyytää ne aina englanniksi, mutta
+  kurssille pakotettu kieli voi ohittaa pyynnön.
 - **"Portti 8080 on jo käytössä":** portissa on jokin muu ohjelma.
   Käynnistä toiseen porttiin: `npm start -- --port 3000`.
 - **Asetukset tai Hae Moodlesta eivät toimi:** avaa dashboard
