@@ -113,7 +113,10 @@ GitHubissa. Käynnistä dashboard päivityksen jälkeen uudelleen ja paina
   kurssilla EXAM-tentti vai Moodle-tentti, ja voit merkitä varatun
   EXAM-päivän.
 - **Viikko:** aseta jokaiselle viikonpäivälle, montako tuntia ehdit
-  opiskella, niin näet mitä kunakin päivänä kannattaa tehdä.
+  opiskella, niin näet mitä kunakin päivänä kannattaa tehdä. Tehtävä saa
+  viikossa enintään tahtinsa (h/vko) verran tunteja. Menneet päivät
+  jäävät näkyviin sellaisina kuin ne suunniteltiin. Kun merkitset Työn
+  alla -tehtävälle valmiusprosentin, jäljellä olevat tunnit pienenevät.
 - **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja
   tehtävää tarkistettiin ja montako määräaikaa Moodlesta löytyi. Vie hiiri
   tekstin päälle nähdäksesi erittelyn kursseittain.

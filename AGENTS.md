@@ -47,7 +47,8 @@ yksityiskohdat.
 
 - **Arvio ja tahti:** lue aina `getPlanHoursPace(item)`:lla, ei suoraan
   `item.estimatedHours`/`item.estimatedPace`. Käsin syötetyt arvot ovat
-  `plan_v1`:ssä ja ohittavat datan arviot.
+  `plan_v1`:ssä ja ohittavat datan arviot. Jäljellä oleva työ (valmiusprosentti
+  huomioituna) saadaan `getRemainingHours(item)`:lla.
 - **Päivämäärä:** käytä `effDate(item)`:ia, joka huomioi varatun
   EXAM-päivän.
 - **Tallennusavaimet:** `itemKey()` (kurssi | päivä | otsikko) sitoo kaikki

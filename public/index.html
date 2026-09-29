@@ -496,6 +496,7 @@
   }
   .deadline input.is-estimate { border-style: dashed; color: var(--text-dim); }
   .deadline .progress-row { display: flex; align-items: center; gap: 6px; }
+  .deadline .progress-row .remaining-hint { color: var(--text-faint); }
   .deadline .progress-input { width: 56px; }
   .deadline .cell-startby { font-size: 0.8rem; font-weight: 600; }
   .deadline .cell-startby.overdue { color: var(--danger); }
@@ -1455,6 +1456,24 @@
   }
   let noStudySet = loadNoStudySet();
 
+  // Viikkosuunnitelman tilannekuvat päivittäin: {isoPäivä: [{k, h, title,
+  // course, color}]}. Tämän päivän suunnitelma tallennetaan joka
+  // piirrolla, joten mennyt päivä jää talteen sellaisena kuin se oli
+  // viimeksi suunniteltu, eikä katoa tai muutu päivän vaihtuessa. Menneet
+  // päivät näytetään viikkonäkymässä tästä, ja kuluvan viikon menneiden
+  // päivien tunnit lasketaan mukaan tehtävän viikkotahtiin.
+  const WEEKPLAN_STORAGE_KEY = "opintodashboard_weekplan_v1";
+  const WEEKPLAN_KEEP_DAYS = 180;
+  function loadWeekPlanMap() {
+    try { return JSON.parse(localStorage.getItem(WEEKPLAN_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveWeekPlanMap(map) {
+    try { localStorage.setItem(WEEKPLAN_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let weekPlanMap = loadWeekPlanMap();
+
   // Kurssikohtainen EXAM-tieto: onko tällä kurssilla itse varattava
   // EXAM-tentti, Moodle-tentti, vai ei tenttiä ollenkaan, seka varaamisen
   // deadline ja oma varattu paiva kun ne tiedetaan.
@@ -1845,8 +1864,25 @@
     const pace = plan.pace != null ? plan.pace : item.estimatedPace;
     return { hours, pace };
   }
+  // Valmiusprosentti ("Valmiina: _ %"), vain "Työn alla" -tehtävillä.
+  function getProgressPct(item) {
+    if (getStatus(item) !== "kesken") return 0;
+    const v = Number(progressMap[itemKey(item.courseId, item)]);
+    return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
+  }
+
+  // Jäljellä oleva työmäärä: Arvio vähennettynä valmiusprosentilla. Käytetään
+  // viikkosuunnitelmassa ja "Aloita viimeistään" -päivässä. Palauttaa
+  // null/0, jos Arviota ei ole.
+  function getRemainingHours(item) {
+    const { hours } = getPlanHoursPace(item);
+    if (!hours) return hours;
+    return Math.round(hours * (1 - getProgressPct(item) / 100) * 10) / 10;
+  }
+
   function computeStartByDate(item) {
-    const { hours, pace } = getPlanHoursPace(item);
+    const { pace } = getPlanHoursPace(item);
+    const hours = getRemainingHours(item);
     if (!hours || !pace) return null;
     const dt = parseDate(effDate(item));
     const weeksNeeded = hours / pace;
@@ -1958,18 +1994,51 @@
       const hours = getPlanHoursPace(it).hours;
       return hours == null || hours <= 0;
     });
+    // Jäljellä oleva työ = Arvio vähennettynä valmiusprosentilla. Täysin
+    // valmiiksi merkityt (100 %) eivät saa enää tunteja.
     const schedulable = qualifying
       .filter((it) => {
         const hours = getPlanHoursPace(it).hours;
         return hours != null && hours > 0;
       })
-      .map((it) => ({ item: it, remaining: getPlanHoursPace(it).hours, deadline: parseDate(effDate(it)) }))
+      .map((it) => {
+        const pace = getPlanHoursPace(it).pace;
+        return {
+          item: it,
+          key: itemKey(it.courseId, it),
+          remaining: getRemainingHours(it),
+          pace: pace > 0 ? pace : null,
+          deadline: parseDate(effDate(it)),
+          weekUsed: {},
+        };
+      })
+      .filter((t) => t.remaining > 0)
       .sort((a, b) => effDate(a.item).localeCompare(effDate(b.item)) || a.item.title.localeCompare(b.item.title));
 
+    // Viikkotahti (h/vko): tehtävä saa korkeintaan tahtinsa verran tunteja
+    // kalenteriviikossa (ma-su). Kuluvan viikon jo menneiden päivien
+    // tallennetut tunnit (weekPlanMap) lasketaan mukaan, jottei tahti
+    // "nollaudu" päivän vaihtuessa.
+    const weekKeyOf = (day) => toIsoDate(addDays(day, -((day.getDay() + 6) % 7)));
+    const thisWeekKey = weekKeyOf(today);
+    const byKey = new Map(schedulable.map((t) => [t.key, t]));
+    for (let d = addDays(today, -((today.getDay() + 6) % 7)); d < today; d = addDays(d, 1)) {
+      (weekPlanMap[toIsoDate(d)] || []).forEach((e) => {
+        const t = byKey.get(e.k);
+        if (t) t.weekUsed[thisWeekKey] = (t.weekUsed[thisWeekKey] || 0) + (e.h || 0);
+      });
+    }
+
+    // Horisontti ulottuu vähintään myöhäisimpään määräaikaan asti, koska
+    // tahtiraja voi levittää työn pitkälle ajalle.
+    const latest = schedulable.reduce((m, t) => Math.max(m, daysBetween(today, t.deadline) + 1), 0);
+    const horizon = Math.min(400, Math.max(WEEK_HORIZON_DAYS, latest));
+
     const perDay = {};
-    for (let offset = 0; offset < WEEK_HORIZON_DAYS; offset++) {
+    for (let offset = 0; offset < horizon; offset++) {
       const day = addDays(today, offset);
       const iso = toIsoDate(day);
+      const wk = weekKeyOf(day);
       const wd = (day.getDay() + 6) % 7; // ma=0 ... su=6
       let capLeft = noStudySet.has(iso) ? 0 : (capacityArr[wd] || 0);
       for (const task of schedulable) {
@@ -1983,10 +2052,14 @@
         // tuleva päivä olisi "deadlinen jälkeen" eikä tehtävä saisi koskaan
         // yhtään tuntia - täsmälleen se bugi joka löytyi 2026-09-24.
         if (task.deadline >= today && day > task.deadline) continue;
-        const alloc = Math.min(capLeft, task.remaining);
+        // Tahtiraja ei koske jo myöhässä olevaa tehtävää: se kirii kiinni.
+        const overdue = task.deadline < today;
+        const paceLeft = task.pace && !overdue ? task.pace - (task.weekUsed[wk] || 0) : Infinity;
+        const alloc = Math.round(Math.min(capLeft, task.remaining, paceLeft) * 10) / 10;
         if (alloc <= 0) continue;
         (perDay[iso] = perDay[iso] || []).push({ item: task.item, hours: alloc });
         task.remaining -= alloc;
+        task.weekUsed[wk] = (task.weekUsed[wk] || 0) + alloc;
         capLeft -= alloc;
       }
     }
@@ -1994,6 +2067,26 @@
       .filter((t) => t.remaining > 0.001)
       .map((t) => ({ item: t.item, missingHours: t.remaining }));
     return { perDay, overflow, noEstimate };
+  }
+
+  // Tallentaa tämän päivän suunnitelman tilannekuvaksi (ks. weekPlanMap) ja
+  // karsii yli puoli vuotta vanhat. Kutsutaan joka refresh():ssä, jotta
+  // päivä tallentuu, vaikka viikkonäkymää ei avattaisi.
+  function recordTodayPlan() {
+    const { perDay } = computeWeekAllocation();
+    const todayIso = toIsoDate(today);
+    weekPlanMap[todayIso] = (perDay[todayIso] || []).map((e) => ({
+      k: itemKey(e.item.courseId, e.item),
+      h: e.hours,
+      title: displayTitle(e.item),
+      course: e.item.courseName,
+      color: e.item.color,
+    }));
+    const cutoff = toIsoDate(addDays(today, -WEEKPLAN_KEEP_DAYS));
+    Object.keys(weekPlanMap).forEach((iso) => {
+      if (iso < cutoff) delete weekPlanMap[iso];
+    });
+    saveWeekPlanMap(weekPlanMap);
   }
 
   // Suodatinnapit toimivat "näytä vain tämä tyyppi" -periaatteella: oletus on
@@ -2168,9 +2261,19 @@
         progressInput.value = v;
         progressMap[key] = v;
         saveProgressMap(progressMap);
+        updateRemainingHint();
       };
       progressRow.appendChild(progressInput);
       progressRow.appendChild(document.createTextNode(" %"));
+      // Jäljellä oleva työmäärä, jota viikkosuunnitelma käyttää.
+      const remainingHint = document.createElement("span");
+      remainingHint.className = "remaining-hint";
+      const updateRemainingHint = () => {
+        const { hours } = getPlanHoursPace(item);
+        remainingHint.textContent = hours ? " (jäljellä " + getRemainingHours(item) + " h / " + hours + " h)" : "";
+      };
+      updateRemainingHint();
+      progressRow.appendChild(remainingHint);
       titleCell.appendChild(progressRow);
     }
     if (isExamSystemItem(item) && !getExamOverride(item)) {
@@ -3384,14 +3487,26 @@
         offNote.textContent = "Ei opiskella";
         col.appendChild(offNote);
       } else {
-        const entries = perDay[iso] || [];
+        // Menneet päivät tallennetusta tilannekuvasta (sellaisina kuin ne
+        // suunniteltiin), tänään ja tulevat lasketusta suunnitelmasta.
+        const itemByKey = isPast ? new Map(allItems.map((it) => [itemKey(it.courseId, it), it])) : null;
+        const entries = isPast
+          ? (weekPlanMap[iso] || []).map((e) => {
+              const it = itemByKey.get(e.k);
+              return {
+                item: it || { courseName: e.course || "", color: e.color || "#3b82f6", title: e.title || "" },
+                title: it ? displayTitle(it) : e.title || "",
+                hours: e.h || 0,
+              };
+            })
+          : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours }));
         let total = 0;
         entries.forEach((e) => {
           total += e.hours;
           const chip = document.createElement("div");
           chip.className = "week-chip";
           chip.style.setProperty("--chip-color", e.item.color);
-          appendItemLabel(chip, e.item, displayTitle(e.item) + " · " + (Math.round(e.hours * 10) / 10) + "h");
+          appendItemLabel(chip, e.item, e.title + " · " + (Math.round(e.hours * 10) / 10) + "h");
           chip.title = e.item.courseName;
           col.appendChild(chip);
         });
@@ -3811,6 +3926,7 @@
   function refresh() {
     today = startOfToday();
     rebuildAllItems();
+    recordTodayPlan();
     route();
   }
 
@@ -4288,6 +4404,7 @@
   document.getElementById("todayLine").textContent =
     "Tänään " + today.toLocaleDateString("fi-FI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  recordTodayPlan();
   route();
 })();
 </script>

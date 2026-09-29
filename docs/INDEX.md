@@ -175,6 +175,7 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `course_state_v1` | Kurssin tila: `completed` tai `hidden` |
 | `capacity_v1` | Viikkonäkymän opiskeluaika viikonpäivittäin |
 | `nostudy_v1` | "Ei opiskella" -päivät |
+| `weekplan_v1` | Viikkosuunnitelman päiväkohtaiset tilannekuvat (`{päivä: [{k, h, title, course, color}]}`), 180 päivää |
 | `last_sync_v1`, `last_google_sync_v1` | Viimeisimmän synkan aikaleima |
 
 ## Palvelimen API
@@ -253,15 +254,29 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 - **Arvio ja tahti** (`getPlanHoursPace()`): käsin syötetty arvo
   (`plan_v1`) ensin, muuten `data.json`:in `estimatedHours`/`estimatedPace`.
   Kaikki laskenta käyttää tätä funktiota.
+- **Jäljellä oleva työ** (`getRemainingHours()`): arvio × (1 − valmiina %).
+  Prosentti on vain Työn alla -tehtävillä. Käytetään "Aloita viimeistään"
+  -päivässä ja viikkosuunnitelmassa; kalenterin työskentelyjakso käyttää
+  koko arviota.
 - **Aloita viimeistään** (`computeStartByDate()`):
-  `effDate - round(arvio / tahti × 7)` päivää. Ei näytetä myöhässä-leimaa
+  `effDate - round(jäljellä / tahti × 7)` päivää. Ei näytetä myöhässä-leimaa
   Työn alla- tai Tehty-tehtäville.
 - **Viikkonäkymä** (`computeWeekAllocation()`): ahne jako tästä päivästä
-  60 päivää eteenpäin. Mukana tehtävät, joiden aloituspäivä on tänään tai
-  mennyt, sekä kaikki Työn alla -tehtävät. Aikaisin deadline ensin; päivä
-  täytetään kapasiteettiin asti ennen seuraavaa tehtävää. Tulevan
-  deadlinen jälkeen ei jaeta tunteja, mutta jo myöhässä olevat tehtävät
-  jaetaan normaalisti ensimmäisinä.
+  eteenpäin (vähintään 60 päivää, tarvittaessa myöhäisimpään määräaikaan
+  asti). Mukana tehtävät, joiden aloituspäivä on tänään tai mennyt, sekä
+  kaikki Työn alla -tehtävät. Jaetaan jäljellä oleva työ (ks. yllä).
+  Aikaisin deadline ensin; päivä täytetään kapasiteettiin asti.
+  - **Tahti:** tehtävä saa enintään tahtinsa (h/vko) verran tunteja
+    kalenteriviikossa (ma–su). Kuluvan viikon menneiden päivien
+    tallennetut tunnit lasketaan mukaan. Jo myöhässä oleva tehtävä ei ole
+    tahtirajan alainen.
+  - Tulevan deadlinen jälkeen ei jaeta tunteja, mutta jo myöhässä olevat
+    tehtävät jaetaan normaalisti ensimmäisinä.
+  - **Tilannekuvat:** `recordTodayPlan()` tallentaa tämän päivän
+    suunnitelman (`weekplan_v1`) joka `refresh()`:ssä ja sivun latauksessa.
+    Menneet päivät näytetään tilannekuvasta, joten ne eivät muutu päivän
+    vaihtuessa. Jos tehtävän työtä ei merkitä (valmiina %), sen tunnit
+    suunnitellaan uudelleen tuleville päiville.
 - **EXAM-varattavuus:** ajat avautuvat noin 30 vrk etukäteen
   (`EXAM_BOOKING_HORIZON_DAYS`).
 
