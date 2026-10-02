@@ -123,12 +123,16 @@ uudelleen.
   EXAM-päivän.
 - **Viikko:** aseta jokaiselle viikonpäivälle, montako tuntia ehdit
   opiskella, niin näet mitä kunakin päivänä kannattaa tehdä. Tehtävä saa
-  viikossa enintään tahtinsa (h/vko) verran tunteja. Menneet päivät
+  viikossa enintään tahtinsa (h/vko) verran tunteja, paitsi jos se ei
+  muuten ehtisi määräaikaan: silloin se saa lisätunteja vapaista päivistä. Menneet päivät
   jäävät näkyviin sellaisina kuin ne suunniteltiin. Kun merkitset Työn
   alla -tehtävälle valmiusprosentin, jäljellä olevat tunnit pienenevät.
   **Lukitse viikko** pitää viikon suunnitelman samana: tehdyksi merkitty
   tehtävä jää paikalleen yliviivattuna, eikä seuraava tehtävä siirry
-  tilalle. **Avaa lukitus** palauttaa ajantasaisen suunnitelman.
+  tilalle, ja tehtäviä voi siirtää päivästä toiseen vetämällä. **Avaa
+  lukitus** palauttaa ajantasaisen suunnitelman. **Jako**-valinnalla viikon
+  työ painottuu alkuviikolle, viikonlopulle tai tasaisesti kaikille
+  päiville, ja **Sekoita aiheita** vuorottelee eri kurssien tehtäviä.
 - **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja
   tehtävää tarkistettiin ja montako määräaikaa Moodlesta löytyi. Vie hiiri
   tekstin päälle nähdäksesi erittelyn kursseittain.

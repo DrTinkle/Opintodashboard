@@ -946,6 +946,12 @@
   /* ==========================================================================
      Viikkonäkymä
      ========================================================================== */
+  .week-options { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 0.8rem; color: var(--text-dim); }
+  .week-options label { display: inline-flex; align-items: center; gap: 6px; }
+  .week-options select { font: inherit; color: var(--text); background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 4px 8px; }
+  .week-chip[draggable="true"] { cursor: grab; }
+  .week-chip.dragging { opacity: 0.4; }
+  .week-day-col.drop-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
   .week-capacity-caption {
     display: flex; align-items: center; gap: 6px;
     font-size: 0.72rem; font-weight: 600; color: var(--text-faint);
@@ -1238,12 +1244,23 @@
       <summary><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Miten viikkosuunnitelma toimii?</summary>
       <div class="info-body">
         <p>Viikkonäkymä jakaa tehtävien Arvio-tunnit päiville: aikaisin deadline ensin, ja jokainen päivä täytetään sen opiskeluajan verran ennen kuin siirrytään seuraavaan tehtävään.</p>
-        <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Työn alla -tehtävän Valmiina-prosentti vähentää jaettavia tunteja, ja tehtävä saa viikossa enintään tahtinsa (h/vko) verran tunteja.</p>
+        <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Työn alla -tehtävän Valmiina-prosentti vähentää jaettavia tunteja, ja tehtävä saa viikossa enintään tahtinsa (h/vko) verran tunteja. Jos tehtävä ei muuten ehtisi valmiiksi ennen määräaikaa, se saa lisätunteja vapaista päivistä.</p>
         <p>Jako lasketaan tästä päivästä eteenpäin, joten se pysyy samana riippumatta siitä, mitä viikkoa selaat. Myöhässä olevat tehtävät saavat tunteja ensimmäisinä. Menneet päivät jäävät näkyviin sellaisina kuin ne suunniteltiin.</p>
-        <p><strong>Lukitse viikko</strong> pitää kuluvan viikon suunnitelman samana: kun merkitset tehtävän tehdyksi, se jää paikalleen yliviivattuna eikä seuraava tehtävä siirry tilalle. Opiskeluajan tai "Ei opiskella" -merkinnän muuttaminen laskee lukitun viikon uudelleen. <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman.</p>
+        <p><strong>Lukitse viikko</strong> pitää kuluvan viikon suunnitelman samana: kun merkitset tehtävän tehdyksi, se jää paikalleen yliviivattuna eikä seuraava tehtävä siirry tilalle. Opiskeluajan tai "Ei opiskella" -merkinnän muuttaminen laskee lukitun viikon uudelleen. <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä. Uudelleenlaskenta (esim. opiskeluajan muutos) kumoaa käsin tehdyt siirrot.</p>
+        <p><strong>Jako</strong> määrää, painottuuko viikon työ alkuviikolle, viikonlopulle vai tasaisesti kaikille päiville opiskeluajan suhteessa. Tehtävän viikkotunnit ja määräajat pysyvät samoina, vain päivä vaihtuu. <strong>Sekoita aiheita</strong> vuorottelee eri kurssien tehtäviä tunnin paloissa sen sijaan, että tehtävä tehtäisiin kerralla loppuun.</p>
         <p>Päivän "Ei opiskella" -painike nollaa kyseisen päivän opiskeluajan, esimerkiksi jos sinulla on muuta menoa.</p>
       </div>
     </details>
+    <div class="week-options">
+      <label>Jako
+        <select id="weekModeSelect">
+          <option value="front">Painotus alkuviikolle</option>
+          <option value="even">Tasaisesti koko viikolle</option>
+          <option value="weekend">Painotus viikonlopulle</option>
+        </select>
+      </label>
+      <label class="week-mix-label"><input type="checkbox" id="weekMixToggle"> Sekoita aiheita</label>
+    </div>
     <div class="week-capacity-caption">Opiskeluaika päivässä (h)</div>
     <div class="week-capacity-row" id="weekCapacityRow"></div>
     <div class="week-warning" id="weekWarning" hidden></div>
@@ -1507,6 +1524,26 @@
     catch (e) { /* selain esto, ei blokata käyttöä */ }
   }
   let weekLockMap = loadWeekLockMap();
+
+  // Viikkosuunnitelman asetukset: mode = miten viikon tunnit jaetaan päiville
+  // ("front" painotus alkuviikolle, "even" tasaisesti, "weekend" painotus
+  // viikonlopulle) ja mix = sekoitetaanko aiheita (vuorotellen eri kursseja)
+  // vai tehdäänkö tehtävä kerrallaan.
+  const WEEKPREFS_STORAGE_KEY = "opintodashboard_weekprefs_v1";
+  const WEEK_MODES = ["front", "even", "weekend"];
+  function loadWeekPrefs() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(WEEKPREFS_STORAGE_KEY) || "{}");
+      return { mode: WEEK_MODES.includes(raw.mode) ? raw.mode : "even", mix: !!raw.mix };
+    } catch (e) {
+      return { mode: "even", mix: false };
+    }
+  }
+  function saveWeekPrefs(prefs) {
+    try { localStorage.setItem(WEEKPREFS_STORAGE_KEY, JSON.stringify(prefs)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let weekPrefs = loadWeekPrefs();
 
   // Kurssikohtainen EXAM-tieto: onko tällä kurssilla itse varattava
   // EXAM-tentti, Moodle-tentti, vai ei tenttiä ollenkaan, seka varaamisen
@@ -2026,6 +2063,173 @@
   // aikataulutettavat tehtävät joilta puuttuu Arvio eikä niitä siksi voida
   // aikatauluttaa lainkaan. "Tehty"/"Ei tehdä" -tehtävät jätetään aina pois,
   // ja koko Arvio jaetaan riippumatta valmiusprosentista.
+  // Jakaa jokaisen kalenteriviikon tunnit uudelleen päiville valitun
+  // painotuksen (weekPrefs.mode) ja sekoituksen (weekPrefs.mix) mukaan.
+  // Pohjana on ahne jako, joka on aina määräaikojen kannalta toteutettava:
+  // tehtäväkohtaiset viikkotunnit (ja siis tahti) eivät muutu, vain se millä
+  // viikon päivällä mitäkin tehdään. Määräaikaa ei koskaan ylitetä.
+  function redistributeWeeks(perDay, start, horizon, usedCap) {
+    if (weekPrefs.mode === "front" && !weekPrefs.mix) return;
+    const end = addDays(start, horizon);
+    let segStart = start;
+    while (segStart < end) {
+      let segEnd = addDays(segStart, 7 - ((segStart.getDay() + 6) % 7));
+      if (segEnd > end) segEnd = end;
+      const days = [];
+      for (let d = segStart; d < segEnd; d = addDays(d, 1)) {
+        const iso = toIsoDate(d);
+        const wd = (d.getDay() + 6) % 7;
+        const cap = noStudySet.has(iso) ? 0 : Math.max(0, (capacityArr[wd] || 0) - (usedCap[iso] || 0));
+        days.push({ iso, date: d, cap: Math.round(cap * 10) });
+      }
+      redistributeSegment(perDay, days);
+      segStart = segEnd;
+    }
+  }
+
+  // Yksi viikko (tai sen loppuosa). Laskenta tehdään kymmenyksinä
+  // kokonaislukuina pyöristysvirheiden välttämiseksi.
+  function redistributeSegment(perDay, days) {
+    const n = days.length;
+    const tasks = new Map();
+    days.forEach((d, i) => {
+      (perDay[d.iso] || []).forEach((e) => {
+        const key = itemKey(e.item.courseId, e.item);
+        let t = tasks.get(key);
+        if (!t) {
+          const dl = parseDate(effDate(e.item));
+          // Viimeinen segmentin päivä, jolle tehtävää saa sijoittaa.
+          let dIdx = n - 1;
+          if (dl >= today) {
+            dIdx = -1;
+            for (let j = n - 1; j >= 0; j--) if (days[j].date <= dl) { dIdx = j; break; }
+            if (dIdx < 0) dIdx = i;
+          }
+          t = { item: e.item, key, course: e.item.courseId, dIdx, overdue: dl < today, dl: effDate(e.item), rem: 0, lastUsed: -1 };
+          tasks.set(key, t);
+        }
+        t.rem += Math.round(e.hours * 10);
+      });
+    });
+    const list = Array.from(tasks.values()).filter((t) => t.rem > 0);
+    const total = list.reduce((sum, t) => sum + t.rem, 0);
+    if (!total) return;
+
+    // Päivien tavoitekuorma painotuksen mukaan.
+    const L = new Array(n).fill(0);
+    const mode = weekPrefs.mode;
+    if (mode === "even") {
+      // Täytetään puolen tunnin paloina aina sitä päivää, jonka kuorma on
+      // suhteessa opiskeluaikaan pienin: tunnit jakautuvat opiskeluajan
+      // suhteessa kaikille päiville.
+      let left = total;
+      while (left > 0) {
+        let best = -1;
+        for (let i = 0; i < n; i++) {
+          if (L[i] >= days[i].cap) continue;
+          if (best < 0 || L[i] / days[i].cap < L[best] / days[best].cap) best = i;
+        }
+        if (best < 0) break;
+        const add = Math.min(5, left, days[best].cap - L[best]);
+        L[best] += add;
+        left -= add;
+      }
+    } else {
+      let left = total;
+      const order = [...Array(n).keys()];
+      if (mode === "weekend") order.reverse();
+      for (const i of order) {
+        const add = Math.min(days[i].cap, left);
+        L[i] = add;
+        left -= add;
+      }
+    }
+    if (L.reduce((a, b) => a + b, 0) !== total) return; // ei pitäisi tapahtua
+
+    // Määräaikaehto: päivään D mennessä kuormaa pitää olla vähintään niiden
+    // tehtävien verran, joiden määräaika on viimeistään D. Vajaus siirretään
+    // myöhemmiltä päiviltä D:tä edeltäville päiville (lähimmät ensin).
+    for (let D = 0; D < n; D++) {
+      const need = list.filter((t) => !t.overdue && t.dIdx <= D).reduce((sum, t) => sum + t.rem, 0);
+      let have = 0;
+      for (let i = 0; i <= D; i++) have += L[i];
+      let deficit = need - have;
+      for (let i = D; i >= 0 && deficit > 0; i--) {
+        const room = days[i].cap - L[i];
+        if (room <= 0) continue;
+        let move = Math.min(room, deficit);
+        // Otetaan pois myöhäisimmiltä päiviltä.
+        for (let j = n - 1; j > D && move > 0; j--) {
+          const take = Math.min(L[j], move);
+          if (take <= 0) continue;
+          L[j] -= take;
+          L[i] += take;
+          move -= take;
+          deficit -= take;
+        }
+      }
+      if (deficit > 0) return; // ei toteutettavissa, pidetään pohjajako
+    }
+
+    // Sijoitus päiville paloina. Ilman sekoitusta jatketaan samaa tehtävää
+    // niin kauan kuin voi (aikaisin määräaika ensin), sekoituksella valitaan
+    // kurssi, jota on tehty pisimpään aikaan.
+    const chunk = weekPrefs.mix ? 10 : 5;
+    const edf = (a, b) => (a.overdue !== b.overdue ? (a.overdue ? -1 : 1) : a.dIdx - b.dIdx || a.dl.localeCompare(b.dl) || a.item.title.localeCompare(b.item.title));
+    const courseUsed = {};
+    let tick = 0;
+    const result = days.map(() => []);
+    for (let i = 0; i < n; i++) {
+      let fill = L[i];
+      let prev = null;
+      while (fill > 0) {
+        const cands = list.filter((t) => t.rem > 0 && t.dIdx >= i);
+        if (!cands.length) break;
+        cands.sort(edf);
+        let ordered;
+        if (weekPrefs.mix) {
+          ordered = cands.slice().sort((a, b) =>
+            (courseUsed[a.course] ?? -1) - (courseUsed[b.course] ?? -1) || a.lastUsed - b.lastUsed || edf(a, b));
+        } else {
+          ordered = prev && prev.rem > 0 && prev.dIdx >= i ? [prev].concat(cands.filter((t) => t !== prev)) : cands;
+        }
+        // Valinta on sallittu, jos myöhempien määräaikojen tehtävät mahtuvat
+        // yhä jäljellä olevaan kuormaan.
+        const feasible = (t, amt) => {
+          let avail = fill - amt;
+          for (let D = i; D < n; D++) {
+            if (D > i) avail += L[D];
+            if (D >= t.dIdx) break;
+            const need = list.filter((x) => !x.overdue && x.dIdx <= D).reduce((sum, x) => sum + x.rem, 0);
+            if (need > avail) return false;
+          }
+          return true;
+        };
+        let pick = null;
+        let amt = 0;
+        for (const t of ordered) {
+          const a = Math.min(chunk, t.rem, fill);
+          if (feasible(t, a)) { pick = t; amt = a; break; }
+        }
+        if (!pick) { pick = cands[0]; amt = Math.min(chunk, pick.rem, fill); }
+        pick.rem -= amt;
+        fill -= amt;
+        pick.lastUsed = tick;
+        courseUsed[pick.course] = tick;
+        tick++;
+        prev = pick;
+        const existing = result[i].find((e) => e.t === pick);
+        if (existing) existing.units += amt;
+        else result[i].push({ t: pick, units: amt });
+      }
+    }
+    if (list.some((t) => t.rem > 0)) return; // ei pitäisi tapahtua: pohjajako jää voimaan
+    days.forEach((d, i) => {
+      if (result[i].length) perDay[d.iso] = result[i].map((e) => ({ item: e.t.item, hours: e.units / 10 }));
+      else delete perDay[d.iso];
+    });
+  }
+
   // opts.start: ensimmäinen suunniteltava päivä (oletus tänään). Lukitun
   // viikon jälkeisiä viikkoja laskettaessa start on seuraava maanantai ja
   // opts.preUsed ({avain: h}) kertoo lukitulle viikolle jo varatut tunnit,
@@ -2093,6 +2297,7 @@
     const horizon = Math.min(400, Math.max(WEEK_HORIZON_DAYS, latest));
 
     const perDay = {};
+    const capLeftByIso = {};
     for (let offset = 0; offset < horizon; offset++) {
       const day = addDays(start, offset);
       const iso = toIsoDate(day);
@@ -2120,7 +2325,28 @@
         task.weekUsed[wk] = (task.weekUsed[wk] || 0) + alloc;
         capLeft -= alloc;
       }
+      capLeftByIso[iso] = capLeft;
     }
+    // Toinen kierros: tahti on toive, määräaika on ehdoton. Jos tehtävä ei
+    // ehdi valmiiksi tahtinsa puitteissa, sille annetaan lisätunteja
+    // vapaasta opiskeluajasta ennen määräaikaa (aikaisin vapaa päivä ensin).
+    for (const task of schedulable) {
+      if (task.remaining <= 0.001 || task.deadline < today) continue;
+      for (let day = start; day <= task.deadline && task.remaining > 0.001; day = addDays(day, 1)) {
+        const iso = toIsoDate(day);
+        const capLeft = capLeftByIso[iso] || 0;
+        if (capLeft <= 0) continue;
+        const alloc = Math.round(Math.min(capLeft, task.remaining) * 10) / 10;
+        if (alloc <= 0) continue;
+        const list = (perDay[iso] = perDay[iso] || []);
+        const existing = list.find((e) => e.item === task.item);
+        if (existing) existing.hours = Math.round((existing.hours + alloc) * 10) / 10;
+        else list.push({ item: task.item, hours: alloc });
+        task.remaining -= alloc;
+        capLeftByIso[iso] = capLeft - alloc;
+      }
+    }
+    redistributeWeeks(perDay, start, horizon, usedCap);
     const overflow = schedulable
       .filter((t) => t.remaining > 0.001)
       .map((t) => ({ item: t.item, missingHours: t.remaining }));
@@ -2173,6 +2399,25 @@
     weekLockMap[currentWeekIso()] = toIsoDate(today);
     saveWeekPlanMap(weekPlanMap);
     saveWeekLockMap(weekLockMap);
+  }
+
+  // Siirtää lukitun viikon laatikon päivästä toiseen (raahaus). Saman
+  // tehtävän tunnit yhdistetään, jos kohdepäivässä on jo sama tehtävä.
+  function moveLockedEntry(fromIso, idx, toIso) {
+    if (fromIso === toIso) return;
+    const todayIso = toIsoDate(today);
+    const nextMondayIso = toIsoDate(addDays(getWeekMonday(0), 7));
+    const inLocked = (iso) => iso >= todayIso && iso < nextMondayIso;
+    if (!isCurrentWeekLocked() || !inLocked(fromIso) || !inLocked(toIso) || noStudySet.has(toIso)) return;
+    const src = weekPlanMap[fromIso] || [];
+    const [entry] = src.splice(idx, 1);
+    if (!entry) return;
+    const dst = (weekPlanMap[toIso] = weekPlanMap[toIso] || []);
+    const same = dst.find((e) => e.k === entry.k);
+    if (same) same.h = Math.round(((same.h || 0) + (entry.h || 0)) * 10) / 10;
+    else dst.push(entry);
+    weekPlanMap[fromIso] = src;
+    saveWeekPlanMap(weekPlanMap);
   }
 
   // Avaa lukituksen: tulevien päivien tallennetut suunnitelmat poistetaan,
@@ -3552,12 +3797,31 @@
     }
     const { perDay, overflow, noEstimate } = alloc;
 
+    const modeSelect = document.getElementById("weekModeSelect");
+    modeSelect.value = weekPrefs.mode;
+    modeSelect.onchange = () => {
+      weekPrefs.mode = WEEK_MODES.includes(modeSelect.value) ? modeSelect.value : "even";
+      saveWeekPrefs(weekPrefs);
+      if (isCurrentWeekLocked()) lockCurrentWeek();
+      else recordTodayPlan();
+      renderWeek();
+    };
+    const mixToggle = document.getElementById("weekMixToggle");
+    mixToggle.checked = weekPrefs.mix;
+    mixToggle.onchange = () => {
+      weekPrefs.mix = mixToggle.checked;
+      saveWeekPrefs(weekPrefs);
+      if (isCurrentWeekLocked()) lockCurrentWeek();
+      else recordTodayPlan();
+      renderWeek();
+    };
+
     const lockBar = document.getElementById("weekLockBar");
     lockBar.hidden = weekOffset !== 0;
     lockBar.classList.toggle("locked", locked);
     const lockDate = locked ? parseDate(weekLockMap[currentWeekIso()]) : null;
     document.getElementById("weekLockText").textContent = locked
-      ? "Viikko lukittu " + fmtShort(lockDate) + " Tehdyt tehtävät jäävät paikalleen."
+      ? "Viikko lukittu " + fmtShort(lockDate) + " Tehdyt tehtävät jäävät paikalleen. Voit siirtää tehtäviä päivästä toiseen vetämällä."
       : "Suunnitelma elää muutosten mukana.";
     const lockBtn = document.getElementById("weekLockBtn");
     lockBtn.textContent = locked ? "Avaa lukitus" : "Lukitse viikko";
@@ -3575,7 +3839,7 @@
       warningEl.hidden = false;
       warningEl.innerHTML = "";
       const heading = document.createElement("div");
-      heading.innerHTML = "<strong>Ei mahdu tälle aikataululle nykyisellä opiskelutahdilla:</strong>";
+      heading.innerHTML = "<strong>Ei ehdi valmiiksi ennen määräaikaa nykyisellä opiskeluajalla:</strong>";
       warningEl.appendChild(heading);
       overflow.forEach((o) => {
         const line = document.createElement("div");
@@ -3656,11 +3920,41 @@
               };
             })
           : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours }));
+        // Lukitun viikon tulevat päivät: laatikoita voi vetää päivästä toiseen.
+        const movable = locked && !isPast && dayDate < nextMonday;
+        if (movable) {
+          col.addEventListener("dragover", (ev) => {
+            ev.preventDefault();
+            col.classList.add("drop-over");
+          });
+          col.addEventListener("dragleave", (ev) => {
+            if (!col.contains(ev.relatedTarget)) col.classList.remove("drop-over");
+          });
+          col.addEventListener("drop", (ev) => {
+            ev.preventDefault();
+            col.classList.remove("drop-over");
+            let data;
+            try { data = JSON.parse(ev.dataTransfer.getData("text/plain")); } catch (e) { return; }
+            if (data && typeof data.from === "string" && Number.isInteger(data.idx)) {
+              moveLockedEntry(data.from, data.idx, iso);
+              renderWeek();
+            }
+          });
+        }
         let total = 0;
-        entries.forEach((e) => {
+        entries.forEach((e, entryIdx) => {
           total += e.hours;
           const chip = document.createElement("div");
           chip.className = "week-chip" + (e.done ? " done" : "");
+          if (movable) {
+            chip.draggable = true;
+            chip.addEventListener("dragstart", (ev) => {
+              ev.dataTransfer.setData("text/plain", JSON.stringify({ from: iso, idx: entryIdx }));
+              ev.dataTransfer.effectAllowed = "move";
+              chip.classList.add("dragging");
+            });
+            chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+          }
           chip.style.setProperty("--chip-color", e.item.color);
           appendItemLabel(chip, e.item, e.title + " · " + (Math.round(e.hours * 10) / 10) + "h");
           chip.title = e.item.courseName;

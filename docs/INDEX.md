@@ -179,6 +179,7 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `nostudy_v1` | "Ei opiskella" -päivät |
 | `weekplan_v1` | Viikkosuunnitelman päiväkohtaiset tilannekuvat (`{päivä: [{k, h, title, course, color}]}`), 180 päivää |
 | `weeklock_v1` | Lukitut viikot (`{maanantai: lukituspäivä}`), 180 päivää |
+| `weekprefs_v1` | Viikkosuunnitelman jako (`mode`: `front`/`even`/`weekend`, oletus `even`) ja aiheiden sekoitus (`mix`) |
 | `last_sync_v1`, `last_google_sync_v1` | Viimeisimmän synkan aikaleima |
 
 ## Palvelimen API
@@ -280,7 +281,10 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
   - **Tahti:** tehtävä saa enintään tahtinsa (h/vko) verran tunteja
     kalenteriviikossa (ma–su). Kuluvan viikon menneiden päivien
     tallennetut tunnit lasketaan mukaan. Jo myöhässä oleva tehtävä ei ole
-    tahtirajan alainen.
+    tahtirajan alainen. Jos tehtävä ei tahdin puitteissa ehdi
+    määräaikaan, toinen kierros antaa sille lisätunteja vapaasta
+    kapasiteetista ennen määräaikaa (aikaisin vapaa päivä ensin). Vasta sen
+    jälkeen puuttuvat tunnit näytetään varoituksena.
   - Tulevan deadlinen jälkeen ei jaeta tunteja, mutta jo myöhässä olevat
     tehtävät jaetaan normaalisti ensimmäisinä.
   - **Tilannekuvat:** `recordTodayPlan()` tallentaa tämän päivän
@@ -298,7 +302,19 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     jälkeiset viikot lasketaan seuraavasta maanantaista, ja lukitulle
     viikolle varatut tunnit vähennetään jäljellä olevasta työstä
     (`opts.preUsed`). Lukituksen avaus poistaa tulevien päivien
-    tilannekuvat.
+    tilannekuvat. Lukitun viikon laatikoita voi raahata päivästä toiseen
+    (`moveLockedEntry()`); uudelleenlaskenta kumoaa käsin tehdyt siirrot.
+  - **Jako ja sekoitus** (`redistributeWeeks()` / `redistributeSegment()`,
+    `weekprefs_v1`): ahneen jaon jälkeen jokaisen kalenteriviikon tunnit
+    jaetaan päiville uudelleen. Tehtäväkohtaiset viikkotunnit (tahti) eivät
+    muutu. Päivien tavoitekuorma: `front` täyttää alusta, `weekend` lopusta,
+    `even` opiskeluajan suhteessa puolen tunnin paloina. Kuormaa siirretään
+    aikaisemmaksi, jos jonkin määräajan tehtävät eivät muuten mahdu ennen
+    määräaikaa. Sijoitus tehdään paloina (sekoituksella 1 h, muuten 0,5 h):
+    ilman sekoitusta jatketaan samaa tehtävää aikaisin määräaika ensin,
+    sekoituksella valitaan kurssi, jota on tehty pisimpään aikaan. Jokainen
+    valinta tarkistetaan niin, että myöhempien määräaikojen tehtävät mahtuvat
+    yhä. Jos uudelleenjako ei jostain syystä onnistu, pohjajako jää voimaan.
 - **EXAM-varattavuus:** ajat avautuvat noin 30 vrk etukäteen
   (`EXAM_BOOKING_HORIZON_DAYS`).
 
