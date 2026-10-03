@@ -127,10 +127,11 @@ uudelleen.
   muuten ehtisi määräaikaan: silloin se saa lisätunteja vapaista päivistä. Menneet päivät
   jäävät näkyviin sellaisina kuin ne suunniteltiin. Kun merkitset Työn
   alla -tehtävälle valmiusprosentin, jäljellä olevat tunnit pienenevät.
-  **Lukitse viikko** pitää viikon suunnitelman samana: tehdyksi merkitty
-  tehtävä jää paikalleen yliviivattuna, eikä seuraava tehtävä siirry
-  tilalle, ja tehtäviä voi siirtää päivästä toiseen vetämällä. **Avaa
-  lukitus** palauttaa ajantasaisen suunnitelman. **Jako**-valinnalla viikon
+  **Lukitse viikko** jäädyttää selattavan viikon: siihen ei lisätä eikä
+  siitä poisteta mitään, tehdyksi merkitty tehtävä jää paikalleen
+  yliviivattuna, ja tehtäviä voi siirtää päivästä toiseen vetämällä.
+  Jokaisen viikon voi lukita erikseen. **Avaa lukitus** palauttaa
+  ajantasaisen suunnitelman. **Jako**-valinnalla viikon
   työ painottuu alkuviikolle, viikonlopulle tai tasaisesti kaikille
   päiville, ja **Sekoita aiheita** vuorottelee eri kurssien tehtäviä.
 - **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja

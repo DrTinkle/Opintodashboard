@@ -292,18 +292,19 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     Menneet päivät näytetään tilannekuvasta, joten ne eivät muutu päivän
     vaihtuessa. Jos tehtävän työtä ei merkitä (valmiina %), sen tunnit
     suunnitellaan uudelleen tuleville päiville.
-  - **Viikon lukitus** (`lockCurrentWeek()` / `unlockCurrentWeek()`,
-    `weeklock_v1`): lukittaessa kuluvan viikon suunnitelma tästä päivästä
-    sunnuntaihin tallennetaan `weekplan_v1`:een ja näytetään siitä. Tehdyksi
-    merkitty tehtävä jää paikalleen yliviivattuna, eikä seuraava siirry
-    tilalle. Opiskeluajan tai "Ei opiskella" -merkinnän muutos laskee
-    lukitut päivät uudelleen niin, että tehdyt tehtävät pysyvät paikallaan
-    ja vievät osansa päivän kapasiteetista (`opts.usedCap`). Lukitun viikon
-    jälkeiset viikot lasketaan seuraavasta maanantaista, ja lukitulle
-    viikolle varatut tunnit vähennetään jäljellä olevasta työstä
-    (`opts.preUsed`). Lukituksen avaus poistaa tulevien päivien
-    tilannekuvat. Lukitun viikon laatikoita voi raahata päivästä toiseen
-    (`moveLockedEntry()`); uudelleenlaskenta kumoaa käsin tehdyt siirrot.
+  - **Viikon lukitus** (`lockWeek()` / `unlockWeek()`, `weeklock_v1`):
+    jokaisen viikon voi lukita erikseen. Lukittaessa viikon päivät tästä
+    päivästä alkaen tallennetaan `weekplan_v1`:een ja näytetään siitä
+    sellaisinaan: niihin ei lisätä eikä niistä poisteta mitään (opiskeluajan,
+    "Ei opiskella" -merkinnän, jaon tai tilojen muutokset eivät vaikuta).
+    Tehdyksi merkitty tehtävä jää paikalleen yliviivattuna. Laskennassa
+    (`getLockedPlan()`) lukitut päivät ovat täynnä (kapasiteetti 0) ja
+    niille lukitut tunnit vähennetään jäljellä olevasta työstä, joten
+    lukitsemattomat viikot suunnitellaan lukittujen ympärille. Jos uusi
+    tehtävä ei mahdu lukitsemattomiin päiviin ennen määräaikaa, se näkyy
+    varoituksena. Lukitun viikon laatikoita voi raahata päivästä toiseen
+    (`moveLockedEntry()`). Lukituksen avaus poistaa viikon tulevien
+    päivien tilannekuvat.
   - **Jako ja sekoitus** (`redistributeWeeks()` / `redistributeSegment()`,
     `weekprefs_v1`): ahneen jaon jälkeen jokaisen kalenteriviikon tunnit
     jaetaan päiville uudelleen. Tehtäväkohtaiset viikkotunnit (tahti) eivät

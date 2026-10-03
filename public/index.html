@@ -1246,7 +1246,7 @@
         <p>Viikkonäkymä jakaa tehtävien Arvio-tunnit päiville: aikaisin deadline ensin, ja jokainen päivä täytetään sen opiskeluajan verran ennen kuin siirrytään seuraavaan tehtävään.</p>
         <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Työn alla -tehtävän Valmiina-prosentti vähentää jaettavia tunteja, ja tehtävä saa viikossa enintään tahtinsa (h/vko) verran tunteja. Jos tehtävä ei muuten ehtisi valmiiksi ennen määräaikaa, se saa lisätunteja vapaista päivistä.</p>
         <p>Jako lasketaan tästä päivästä eteenpäin, joten se pysyy samana riippumatta siitä, mitä viikkoa selaat. Myöhässä olevat tehtävät saavat tunteja ensimmäisinä. Menneet päivät jäävät näkyviin sellaisina kuin ne suunniteltiin.</p>
-        <p><strong>Lukitse viikko</strong> pitää kuluvan viikon suunnitelman samana: kun merkitset tehtävän tehdyksi, se jää paikalleen yliviivattuna eikä seuraava tehtävä siirry tilalle. Opiskeluajan tai "Ei opiskella" -merkinnän muuttaminen laskee lukitun viikon uudelleen. <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä. Uudelleenlaskenta (esim. opiskeluajan muutos) kumoaa käsin tehdyt siirrot.</p>
+        <p><strong>Lukitse viikko</strong> jäädyttää selattavan viikon suunnitelman: siihen ei lisätä eikä siitä poisteta mitään, vaikka merkitset tehtäviä tehdyksi tai muutat opiskeluaikaa. Tehdyt tehtävät jäävät paikalleen yliviivattuina. Jokaisen viikon voi lukita erikseen, ja lukitsemattomat viikot suunnitellaan lukittujen ympärille. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä. <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman.</p>
         <p><strong>Jako</strong> määrää, painottuuko viikon työ alkuviikolle, viikonlopulle vai tasaisesti kaikille päiville opiskeluajan suhteessa. Tehtävän viikkotunnit ja määräajat pysyvät samoina, vain päivä vaihtuu. <strong>Sekoita aiheita</strong> vuorottelee eri kurssien tehtäviä tunnin paloissa sen sijaan, että tehtävä tehtäisiin kerralla loppuun.</p>
         <p>Päivän "Ei opiskella" -painike nollaa kyseisen päivän opiskeluajan, esimerkiksi jos sinulla on muuta menoa.</p>
       </div>
@@ -1509,11 +1509,12 @@
   }
   let weekPlanMap = loadWeekPlanMap();
 
-  // Lukitut viikot: {maanantaiIso: lukituspäiväIso}. Lukitun viikon päivät
-  // tästä päivästä sunnuntaihin tallennetaan weekPlanMapiin lukittaessa ja
-  // näytetään siitä, joten tehdyksi merkitty tehtävä jää paikalleen
-  // (yliviivattuna) eikä seuraava tehtävä siirry tilalle. Lukitsemattoman
-  // viikon tämä päivä ja tulevat päivät lasketaan aina uudelleen.
+  // Lukitut viikot: {maanantaiIso: lukituspäiväIso}. Jokaisen viikon voi
+  // lukita erikseen. Lukitun viikon päivät (tästä päivästä alkaen)
+  // tallennetaan weekPlanMapiin lukittaessa ja näytetään siitä sellaisinaan:
+  // niihin ei lasketa mitään lisää eikä niistä poisteta mitään, ja tehdyksi
+  // merkitty tehtävä jää paikalleen yliviivattuna. Ainoa muutos on käyttäjän
+  // oma raahaus. Lukitsemattomat viikot lasketaan lukittujen ympärille.
   const WEEKLOCK_STORAGE_KEY = "opintodashboard_weeklock_v1";
   function loadWeekLockMap() {
     try { return JSON.parse(localStorage.getItem(WEEKLOCK_STORAGE_KEY) || "{}"); }
@@ -2068,7 +2069,7 @@
   // Pohjana on ahne jako, joka on aina määräaikojen kannalta toteutettava:
   // tehtäväkohtaiset viikkotunnit (ja siis tahti) eivät muutu, vain se millä
   // viikon päivällä mitäkin tehdään. Määräaikaa ei koskaan ylitetä.
-  function redistributeWeeks(perDay, start, horizon, usedCap) {
+  function redistributeWeeks(perDay, start, horizon, lockedDays) {
     if (weekPrefs.mode === "front" && !weekPrefs.mix) return;
     const end = addDays(start, horizon);
     let segStart = start;
@@ -2079,7 +2080,7 @@
       for (let d = segStart; d < segEnd; d = addDays(d, 1)) {
         const iso = toIsoDate(d);
         const wd = (d.getDay() + 6) % 7;
-        const cap = noStudySet.has(iso) ? 0 : Math.max(0, (capacityArr[wd] || 0) - (usedCap[iso] || 0));
+        const cap = noStudySet.has(iso) || lockedDays.has(iso) ? 0 : capacityArr[wd] || 0;
         days.push({ iso, date: d, cap: Math.round(cap * 10) });
       }
       redistributeSegment(perDay, days);
@@ -2230,15 +2231,11 @@
     });
   }
 
-  // opts.start: ensimmäinen suunniteltava päivä (oletus tänään). Lukitun
-  // viikon jälkeisiä viikkoja laskettaessa start on seuraava maanantai ja
-  // opts.preUsed ({avain: h}) kertoo lukitulle viikolle jo varatut tunnit,
-  // jotka vähennetään jäljellä olevasta työstä. opts.usedCap ({isoPäivä: h})
-  // on päivälle jo käytetty opiskeluaika (lukitun viikon tehdyt tehtävät).
-  function computeWeekAllocation(opts) {
-    const start = (opts && opts.start) || today;
-    const preUsed = (opts && opts.preUsed) || {};
-    const usedCap = (opts && opts.usedCap) || {};
+  // Lukittujen viikkojen päivät ovat jo täynnä (kapasiteetti 0), ja niihin
+  // lukitut tunnit vähennetään tehtävien jäljellä olevasta työstä.
+  function computeWeekAllocation() {
+    const start = today;
+    const { lockedDays, preUsed } = getLockedPlan();
     const qualifying = allItems.filter((it) => {
       if (!isVisible(it)) return false;
       const status = getStatus(it);
@@ -2303,7 +2300,7 @@
       const iso = toIsoDate(day);
       const wk = weekKeyOf(day);
       const wd = (day.getDay() + 6) % 7; // ma=0 ... su=6
-      let capLeft = noStudySet.has(iso) ? 0 : Math.max(0, (capacityArr[wd] || 0) - (usedCap[iso] || 0));
+      let capLeft = noStudySet.has(iso) || lockedDays.has(iso) ? 0 : capacityArr[wd] || 0;
       for (const task of schedulable) {
         if (capLeft <= 0) break;
         if (task.remaining <= 0) continue;
@@ -2346,7 +2343,7 @@
         capLeftByIso[iso] = capLeft - alloc;
       }
     }
-    redistributeWeeks(perDay, start, horizon, usedCap);
+    redistributeWeeks(perDay, start, horizon, lockedDays);
     const overflow = schedulable
       .filter((t) => t.remaining > 0.001)
       .map((t) => ({ item: t.item, missingHours: t.remaining }));
@@ -2363,40 +2360,47 @@
     }));
   }
 
-  function currentWeekIso() {
-    return toIsoDate(getWeekMonday(0));
+  function weekMondayIso(dateOrIso) {
+    const d = typeof dateOrIso === "string" ? parseDate(dateOrIso) : dateOrIso;
+    return toIsoDate(addDays(d, -((d.getDay() + 6) % 7)));
   }
-  function isCurrentWeekLocked() {
-    return !!weekLockMap[currentWeekIso()];
+  function isWeekLocked(mondayIso) {
+    return !!weekLockMap[mondayIso];
+  }
+  // Lukittu päivä = lukitun viikon päivä tästä päivästä eteenpäin (menneet
+  // päivät näytetään joka tapauksessa tilannekuvasta).
+  function isDayLocked(iso) {
+    return iso >= toIsoDate(today) && isWeekLocked(weekMondayIso(iso));
+  }
+  function getLockedPlan() {
+    const lockedDays = new Set();
+    const preUsed = {};
+    const todayIso = toIsoDate(today);
+    Object.keys(weekLockMap).forEach((mondayIso) => {
+      const monday = parseDate(mondayIso);
+      for (let i = 0; i < 7; i++) {
+        const iso = toIsoDate(addDays(monday, i));
+        if (iso < todayIso) continue;
+        lockedDays.add(iso);
+        (weekPlanMap[iso] || []).forEach((e) => { preUsed[e.k] = (preUsed[e.k] || 0) + (e.h || 0); });
+      }
+    });
+    return { lockedDays, preUsed };
   }
 
-  // Lukitsee kuluvan viikon: laskee suunnitelman tästä päivästä sunnuntaihin
-  // ja tallentaa sen. Kutsutaan myös lukitun viikon opiskeluajan tai
-  // "Ei opiskella" -merkinnän muuttuessa, jolloin lukitut päivät lasketaan
-  // uudelleen muutosten mukaan. Uudelleenlaskennassa jo tehdyksi merkityt
-  // tehtävät pysyvät paikallaan ja vievät päivän opiskeluajasta osansa.
-  function lockCurrentWeek() {
-    const nextMonday = addDays(getWeekMonday(0), 7);
-    const itemByKey = new Map(allItems.map((it) => [itemKey(it.courseId, it), it]));
-    const keep = {};
-    const usedCap = {};
-    if (isCurrentWeekLocked()) {
-      for (let d = today; d < nextMonday; d = addDays(d, 1)) {
-        const iso = toIsoDate(d);
-        keep[iso] = (weekPlanMap[iso] || []).filter((e) => {
-          const it = itemByKey.get(e.k);
-          const st = it ? getStatus(it) : null;
-          return st === "tehty" || st === "ei-tehda";
-        });
-        usedCap[iso] = keep[iso].reduce((sum, e) => sum + (e.h || 0), 0);
-      }
+  // Lukitsee viikon: tallentaa sen päivät (tästä päivästä alkaen) sellaisina
+  // kuin ne nyt näkyvät. Sen jälkeen niitä ei lasketa uudelleen.
+  function lockWeek(mondayIso) {
+    if (isWeekLocked(mondayIso)) return;
+    const { perDay } = computeWeekAllocation();
+    const monday = parseDate(mondayIso);
+    const todayIso = toIsoDate(today);
+    for (let i = 0; i < 7; i++) {
+      const iso = toIsoDate(addDays(monday, i));
+      if (iso < todayIso) continue;
+      weekPlanMap[iso] = planSnapshot(perDay[iso]);
     }
-    const { perDay } = computeWeekAllocation({ usedCap });
-    for (let d = today; d < nextMonday; d = addDays(d, 1)) {
-      const iso = toIsoDate(d);
-      weekPlanMap[iso] = (keep[iso] || []).concat(planSnapshot(perDay[iso]));
-    }
-    weekLockMap[currentWeekIso()] = toIsoDate(today);
+    weekLockMap[mondayIso] = todayIso;
     saveWeekPlanMap(weekPlanMap);
     saveWeekLockMap(weekLockMap);
   }
@@ -2405,10 +2409,7 @@
   // tehtävän tunnit yhdistetään, jos kohdepäivässä on jo sama tehtävä.
   function moveLockedEntry(fromIso, idx, toIso) {
     if (fromIso === toIso) return;
-    const todayIso = toIsoDate(today);
-    const nextMondayIso = toIsoDate(addDays(getWeekMonday(0), 7));
-    const inLocked = (iso) => iso >= todayIso && iso < nextMondayIso;
-    if (!isCurrentWeekLocked() || !inLocked(fromIso) || !inLocked(toIso) || noStudySet.has(toIso)) return;
+    if (!isDayLocked(fromIso) || !isDayLocked(toIso)) return;
     const src = weekPlanMap[fromIso] || [];
     const [entry] = src.splice(idx, 1);
     if (!entry) return;
@@ -2420,15 +2421,19 @@
     saveWeekPlanMap(weekPlanMap);
   }
 
-  // Avaa lukituksen: tulevien päivien tallennetut suunnitelmat poistetaan,
-  // ja tämä päivä tallennetaan heti ajantasaisena.
-  function unlockCurrentWeek() {
-    delete weekLockMap[currentWeekIso()];
+  // Avaa viikon lukituksen: sen tulevien päivien tallennetut suunnitelmat
+  // poistetaan, ja tämä päivä tallennetaan heti ajantasaisena.
+  function unlockWeek(mondayIso) {
+    if (!isWeekLocked(mondayIso)) return;
+    delete weekLockMap[mondayIso];
+    const monday = parseDate(mondayIso);
     const todayIso = toIsoDate(today);
-    Object.keys(weekPlanMap).forEach((iso) => {
+    for (let i = 0; i < 7; i++) {
+      const iso = toIsoDate(addDays(monday, i));
       if (iso > todayIso) delete weekPlanMap[iso];
-    });
+    }
     saveWeekLockMap(weekLockMap);
+    saveWeekPlanMap(weekPlanMap);
     recordTodayPlan();
   }
 
@@ -2438,7 +2443,7 @@
   // päiviin ei kosketa.
   function recordTodayPlan() {
     const todayIso = toIsoDate(today);
-    if (!isCurrentWeekLocked()) {
+    if (!isDayLocked(todayIso)) {
       const { perDay } = computeWeekAllocation();
       weekPlanMap[todayIso] = planSnapshot(perDay[todayIso]);
     }
@@ -3771,7 +3776,6 @@
         input.value = v;
         capacityArr[idx] = v;
         saveCapacityMap(capacityArr);
-        if (isCurrentWeekLocked()) lockCurrentWeek();
         // Viivästetty: muuten samaan aikaan klikattu nappi (esim. "Ei
         // opiskella") katoaa alta, kun näkymä rakennetaan uudelleen.
         setTimeout(renderWeek, 0);
@@ -3781,29 +3785,16 @@
       capRow.appendChild(cell);
     });
 
-    // Lukitun kuluvan viikon jälkeiset viikot lasketaan lukitun
-    // suunnitelman päälle: lukitulle viikolle varatut tunnit on jo "käytetty".
-    const locked = isCurrentWeekLocked();
-    const nextMonday = addDays(getWeekMonday(0), 7);
-    let alloc;
-    if (locked && weekOffset > 0) {
-      const preUsed = {};
-      for (let d = today; d < nextMonday; d = addDays(d, 1)) {
-        (weekPlanMap[toIsoDate(d)] || []).forEach((e) => { preUsed[e.k] = (preUsed[e.k] || 0) + (e.h || 0); });
-      }
-      alloc = computeWeekAllocation({ start: nextMonday, preUsed });
-    } else {
-      alloc = computeWeekAllocation();
-    }
-    const { perDay, overflow, noEstimate } = alloc;
+    const viewMondayIso = toIsoDate(monday);
+    const locked = isWeekLocked(viewMondayIso);
+    const { perDay, overflow, noEstimate } = computeWeekAllocation();
 
     const modeSelect = document.getElementById("weekModeSelect");
     modeSelect.value = weekPrefs.mode;
     modeSelect.onchange = () => {
       weekPrefs.mode = WEEK_MODES.includes(modeSelect.value) ? modeSelect.value : "even";
       saveWeekPrefs(weekPrefs);
-      if (isCurrentWeekLocked()) lockCurrentWeek();
-      else recordTodayPlan();
+      recordTodayPlan();
       renderWeek();
     };
     const mixToggle = document.getElementById("weekMixToggle");
@@ -3811,26 +3802,26 @@
     mixToggle.onchange = () => {
       weekPrefs.mix = mixToggle.checked;
       saveWeekPrefs(weekPrefs);
-      if (isCurrentWeekLocked()) lockCurrentWeek();
-      else recordTodayPlan();
+      recordTodayPlan();
       renderWeek();
     };
 
     const lockBar = document.getElementById("weekLockBar");
-    lockBar.hidden = weekOffset !== 0;
+    // Menneitä viikkoja ei lukita (ne näytetään jo tilannekuvista).
+    lockBar.hidden = toIsoDate(sunday) < toIsoDate(today);
     lockBar.classList.toggle("locked", locked);
-    const lockDate = locked ? parseDate(weekLockMap[currentWeekIso()]) : null;
+    const lockDate = locked ? parseDate(weekLockMap[viewMondayIso]) : null;
     document.getElementById("weekLockText").textContent = locked
-      ? "Viikko lukittu " + fmtShort(lockDate) + " Tehdyt tehtävät jäävät paikalleen. Voit siirtää tehtäviä päivästä toiseen vetämällä."
+      ? "Viikko lukittu " + fmtShort(lockDate) + " Suunnitelma ei muutu, ja tehdyt tehtävät jäävät paikalleen. Voit siirtää tehtäviä päivästä toiseen vetämällä."
       : "Suunnitelma elää muutosten mukana.";
     const lockBtn = document.getElementById("weekLockBtn");
     lockBtn.textContent = locked ? "Avaa lukitus" : "Lukitse viikko";
     lockBtn.title = locked
-      ? "Suunnitelma lasketaan taas ajantasaisesta tilanteesta"
-      : "Pidä tämän viikon suunnitelma samana, vaikka merkitset tehtäviä tehdyksi";
+      ? "Viikon suunnitelma lasketaan taas ajantasaisesta tilanteesta"
+      : "Pidä tämän viikon suunnitelma täsmälleen samana";
     lockBtn.onclick = () => {
-      if (isCurrentWeekLocked()) unlockCurrentWeek();
-      else lockCurrentWeek();
+      if (isWeekLocked(viewMondayIso)) unlockWeek(viewMondayIso);
+      else lockWeek(viewMondayIso);
       renderWeek();
     };
 
@@ -3880,8 +3871,10 @@
       head.innerHTML = "<span class=\"weekday-name\">" + WEEKDAYS_FI[i] + "</span>" + dayDate.getDate() + "." + (dayDate.getMonth() + 1) + ".";
       col.appendChild(head);
 
-      const dayOff = noStudySet.has(iso);
-      if (!isPast) {
+      const dayLocked = locked && !isPast;
+      // Lukittu päivä näytetään aina tallennettuna, "Ei opiskella" ei koske sitä.
+      const dayOff = noStudySet.has(iso) && !dayLocked;
+      if (!isPast && !dayLocked) {
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "week-nostudy-toggle" + (dayOff ? " active" : "");
@@ -3891,7 +3884,6 @@
           if (noStudySet.has(iso)) noStudySet.delete(iso);
           else noStudySet.add(iso);
           saveNoStudySet(noStudySet);
-          if (isCurrentWeekLocked() && dayDate < nextMonday) lockCurrentWeek();
           renderWeek();
         };
         col.appendChild(toggle);
@@ -3906,7 +3898,7 @@
       } else {
         // Menneet päivät ja lukitun viikon päivät tallennetusta
         // tilannekuvasta, muut lasketusta suunnitelmasta.
-        const fromSnapshot = isPast || (locked && dayDate < nextMonday);
+        const fromSnapshot = isPast || dayLocked;
         const itemByKey = fromSnapshot ? new Map(allItems.map((it) => [itemKey(it.courseId, it), it])) : null;
         const entries = fromSnapshot
           ? (weekPlanMap[iso] || []).map((e) => {
@@ -3921,7 +3913,7 @@
             })
           : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours }));
         // Lukitun viikon tulevat päivät: laatikoita voi vetää päivästä toiseen.
-        const movable = locked && !isPast && dayDate < nextMonday;
+        const movable = dayLocked;
         if (movable) {
           col.addEventListener("dragover", (ev) => {
             ev.preventDefault();
