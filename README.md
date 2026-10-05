@@ -131,7 +131,10 @@ uudelleen.
   siitä poisteta mitään, tehdyksi merkitty tehtävä jää paikalleen
   yliviivattuna, ja tehtäviä voi siirtää päivästä toiseen vetämällä.
   Jokaisen viikon voi lukita erikseen. **Avaa lukitus** palauttaa
-  ajantasaisen suunnitelman. **Jako**-valinnalla viikon
+  ajantasaisen suunnitelman. Klikkaamalla laatikkoa voit lukitulla
+  viikolla muuttaa sen tunteja tai jakaa sen kahtia, merkitä osan
+  tehdyksi (tehtävän valmiusprosentti lasketaan tehdyistä osista) ja
+  seurata ajastimella, paljonko aikaa tehtävään oikeasti menee. **Jako**-valinnalla viikon
   työ painottuu alkuviikolle, viikonlopulle tai tasaisesti kaikille
   päiville, ja **Sekoita aiheita** vuorottelee eri kurssien tehtäviä.
 - **Hae Moodlesta -tulos:** yläpalkin alla näkyy, montako kurssia ja

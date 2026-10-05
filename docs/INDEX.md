@@ -179,6 +179,7 @@ Kaikki avaimet alkavat `opintodashboard_` ja päättyvät versioon `_v1`.
 | `nostudy_v1` | "Ei opiskella" -päivät |
 | `weekplan_v1` | Viikkosuunnitelman päiväkohtaiset tilannekuvat (`{päivä: [{k, h, title, course, color}]}`), 180 päivää |
 | `weeklock_v1` | Lukitut viikot (`{maanantai: lukituspäivä}`), 180 päivää |
+| `timelog_v1` | Tehtäviin käytetty aika (`{avain: {min, start}}`); `start` on käynnissä olevan ajastimen aloitushetki |
 | `weekprefs_v1` | Viikkosuunnitelman jako (`mode`: `front`/`even`/`weekend`, oletus `even`) ja aiheiden sekoitus (`mix`) |
 | `last_sync_v1`, `last_google_sync_v1` | Viimeisimmän synkan aikaleima |
 
@@ -305,6 +306,19 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     varoituksena. Lukitun viikon laatikoita voi raahata päivästä toiseen
     (`moveLockedEntry()`). Lukituksen avaus poistaa viikon tulevien
     päivien tilannekuvat.
+  - **Laatikon muokkaus** (`openChipEditor()`): lukitun päivän laatikon
+    tunteja voi muuttaa (`setLockedEntryHours()`) ja sen voi jakaa kahtia
+    (`splitLockedEntry()`). Tallennetun laatikon (lukittu tai mennyt päivä)
+    voi merkitä tehdyksi (`done: true` tilannekuvassa,
+    `setEntryPartDone()`): tehtävän valmiusprosentti lasketaan tehtyjen
+    osien tunneista suhteessa Arvioon (`recomputeProgressFromParts()`, korvaa
+    käsin syötetyn prosentin) ja Avoin-tila muuttuu Työn alla -tilaksi.
+    Tehdyt osat eivät kuulu `preUsed`-summaan, koska ne ovat jo
+    prosentissa. Määräajan jälkeiselle päivälle siirretty laatikko näkyy
+    katkoviivalla.
+  - **Ajastin** (`timelog_v1`): yksi ajastin kerrallaan, käynnistys
+    pysäyttää edellisen. Käytetty aika näkyy laatikon ikkunassa (myös
+    prosentteina Arviosta) ja Työn alla -rivin "jäljellä"-tekstissä.
   - **Jako ja sekoitus** (`redistributeWeeks()` / `redistributeSegment()`,
     `weekprefs_v1`): ahneen jaon jälkeen jokaisen kalenteriviikon tunnit
     jaetaan päiville uudelleen. Tehtäväkohtaiset viikkotunnit (tahti) eivät

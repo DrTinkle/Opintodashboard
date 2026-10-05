@@ -996,6 +996,28 @@
   .week-lock-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-dim); margin: 4px 0 10px; }
   .week-lock-bar.locked { color: var(--accent); font-weight: 600; }
   .week-chip.done { opacity: 0.5; text-decoration: line-through; }
+  .week-chip { position: relative; cursor: pointer; }
+  .week-chip .chip-check {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; padding: 0;
+    border-radius: 50%; border: 1px solid color-mix(in srgb, var(--chip-color, #3b82f6) 50%, transparent);
+    background: transparent; color: transparent; font-size: 0.65rem; line-height: 1; cursor: pointer;
+  }
+  .week-chip:hover .chip-check { color: color-mix(in srgb, var(--chip-color, #3b82f6) 70%, var(--text)); }
+  .week-chip .chip-check.on { background: var(--chip-color, #3b82f6); color: #fff; border-color: transparent; }
+  .week-chip.done .chip-check.on { opacity: 1; }
+  .week-chip:has(.chip-check) { padding-right: 26px; }
+  .week-chip .chip-timer { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 0.68rem; font-variant-numeric: tabular-nums; }
+  .week-chip .chip-timer .icon { width: 12px; height: 12px; }
+  .week-chip.past-deadline { outline: 1px dashed var(--danger); outline-offset: -1px; }
+  .week-chip.timing { box-shadow: inset 3px 0 0 var(--chip-color, #3b82f6), 0 0 0 2px var(--accent); }
+  .chip-edit-sub { margin: -10px 0 16px !important; }
+  .chip-edit-buttons { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip-edit-done { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+  .chip-edit-heading { margin: 18px 0 10px; font-size: 0.9rem; font-weight: 650; }
+  .chip-timer-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .chip-edit-timer { font-size: 1.6rem; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .chip-edit-box button { font: inherit; font-size: 0.85rem; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text); cursor: pointer; }
+  .chip-edit-box button:disabled { opacity: 0.5; cursor: not-allowed; }
   .week-chip {
     font-size: 0.72rem; font-weight: 600; line-height: 1.4;
     padding: 6px 8px;
@@ -1247,6 +1269,7 @@
         <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Työn alla -tehtävän Valmiina-prosentti vähentää jaettavia tunteja, ja tehtävä saa viikossa enintään tahtinsa (h/vko) verran tunteja. Jos tehtävä ei muuten ehtisi valmiiksi ennen määräaikaa, se saa lisätunteja vapaista päivistä.</p>
         <p>Jako lasketaan tästä päivästä eteenpäin, joten se pysyy samana riippumatta siitä, mitä viikkoa selaat. Myöhässä olevat tehtävät saavat tunteja ensimmäisinä. Menneet päivät jäävät näkyviin sellaisina kuin ne suunniteltiin.</p>
         <p><strong>Lukitse viikko</strong> jäädyttää selattavan viikon suunnitelman: siihen ei lisätä eikä siitä poisteta mitään, vaikka merkitset tehtäviä tehdyksi tai muutat opiskeluaikaa. Tehdyt tehtävät jäävät paikalleen yliviivattuina. Jokaisen viikon voi lukita erikseen, ja lukitsemattomat viikot suunnitellaan lukittujen ympärille. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä. <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman.</p>
+        <p>Klikkaa laatikkoa avataksesi sen: lukitulla viikolla voit muuttaa laatikon tunteja ja jakaa sen kahtia (osan voi sitten vetää toiselle päivälle). Laatikon ✓ merkitsee osan tehdyksi, ja tehtävän valmiusprosentti lasketaan tehtyjen osien tunneista suhteessa Arvioon. Ajastimella tai syöttämällä näet, paljonko aikaa tehtävään on oikeasti mennyt verrattuna Arvioon.</p>
         <p><strong>Jako</strong> määrää, painottuuko viikon työ alkuviikolle, viikonlopulle vai tasaisesti kaikille päiville opiskeluajan suhteessa. Tehtävän viikkotunnit ja määräajat pysyvät samoina, vain päivä vaihtuu. <strong>Sekoita aiheita</strong> vuorottelee eri kurssien tehtäviä tunnin paloissa sen sijaan, että tehtävä tehtäisiin kerralla loppuun.</p>
         <p>Päivän "Ei opiskella" -painike nollaa kyseisen päivän opiskeluajan, esimerkiksi jos sinulla on muuta menoa.</p>
       </div>
@@ -1324,6 +1347,39 @@
     </section>
   </div>
 
+  <div id="chipEditOverlay" class="modal-overlay" hidden>
+    <div class="modal-box chip-edit-box">
+      <h3 id="chipEditTitle"></h3>
+      <p class="field-hint chip-edit-sub" id="chipEditSub"></p>
+      <div id="chipEditPlan">
+        <label class="field-label">Tunnit tälle päivälle
+          <input type="number" id="chipEditHours" min="0.5" step="0.5">
+        </label>
+        <div class="chip-edit-buttons">
+          <button type="button" id="chipEditSplit">Jaa kahtia</button>
+          <label class="chip-edit-done"><input type="checkbox" id="chipEditDone"> Tämä osa tehty</label>
+        </div>
+        <p class="field-hint" id="chipEditProgress"></p>
+      </div>
+      <p class="field-hint" id="chipEditUnlockedHint" hidden>Lukitse viikko, niin voit muuttaa laatikon tunteja, jakaa sen kahtia ja merkitä osia tehdyksi.</p>
+      <div id="chipEditTimeSection">
+        <h4 class="chip-edit-heading">Käytetty aika</h4>
+        <div class="chip-timer-row">
+          <span id="chipEditTimer" class="chip-edit-timer">0:00</span>
+          <button type="button" id="chipEditTimerBtn">Käynnistä</button>
+        </div>
+        <label class="field-label">Käytetty yhteensä (h)
+          <input type="number" id="chipEditSpent" min="0" step="0.25">
+        </label>
+        <p class="field-hint" id="chipEditSpentHint"></p>
+      </div>
+      <div class="modal-actions">
+        <span class="modal-actions-spacer"></span>
+        <button type="button" id="chipEditClose">Sulje</button>
+      </div>
+    </div>
+  </div>
+
   <div id="taskFormOverlay" class="modal-overlay" hidden>
     <div class="modal-box">
       <h3 id="taskFormHeading">Uusi tehtävä</h3>
@@ -1380,6 +1436,7 @@
 (function () {
   // Viivaikonit (inline-SVG) JS:n luomille painikkeille ja korteille.
   const ICON_PATHS = {
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     "pencil": '<path d="M4 20h4L19 9a2.83 2.83 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
     "x": '<path d="M6 6l12 12M18 6 6 18"/>',
     "book": '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>',
@@ -1545,6 +1602,52 @@
     catch (e) { /* selain esto, ei blokata käyttöä */ }
   }
   let weekPrefs = loadWeekPrefs();
+
+  // Tehtäviin käytetty aika: {avain: {min: käytetyt minuutit, start:
+  // ajastimen käynnistyshetki (ms) tai null}}. Vain yksi ajastin kerrallaan;
+  // käynnissä oleva ajastin säilyy sivun uudelleenlatauksen yli.
+  const TIMELOG_STORAGE_KEY = "opintodashboard_timelog_v1";
+  function loadTimeLog() {
+    try { return JSON.parse(localStorage.getItem(TIMELOG_STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveTimeLog(map) {
+    try { localStorage.setItem(TIMELOG_STORAGE_KEY, JSON.stringify(map)); }
+    catch (e) { /* selain esto, ei blokata käyttöä */ }
+  }
+  let timeLog = loadTimeLog();
+  function getSpentMinutes(key) {
+    const t = timeLog[key];
+    if (!t) return 0;
+    return (t.min || 0) + (t.start ? Math.max(0, Date.now() - t.start) / 60000 : 0);
+  }
+  function runningTimerKey() {
+    return Object.keys(timeLog).find((k) => timeLog[k] && timeLog[k].start) || null;
+  }
+  function stopTimer(key) {
+    const t = timeLog[key];
+    if (!t || !t.start) return;
+    t.min = (t.min || 0) + Math.max(0, Date.now() - t.start) / 60000;
+    t.start = null;
+    saveTimeLog(timeLog);
+  }
+  function startTimer(key) {
+    const running = runningTimerKey();
+    if (running && running !== key) stopTimer(running);
+    const t = (timeLog[key] = timeLog[key] || { min: 0, start: null });
+    if (!t.start) t.start = Date.now();
+    saveTimeLog(timeLog);
+  }
+  function setSpentMinutes(key, min) {
+    const t = (timeLog[key] = timeLog[key] || { min: 0, start: null });
+    t.min = Math.max(0, min);
+    if (t.start) t.start = Date.now();
+    saveTimeLog(timeLog);
+  }
+  function fmtDuration(min) {
+    const m = Math.max(0, Math.round(min));
+    return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0");
+  }
 
   // Kurssikohtainen EXAM-tieto: onko tällä kurssilla itse varattava
   // EXAM-tentti, Moodle-tentti, vai ei tenttiä ollenkaan, seka varaamisen
@@ -1740,6 +1843,7 @@
       [planMap, savePlanMap],
       [progressMap, saveProgressMap],
       [editsMap, saveEditsMap],
+      [timeLog, saveTimeLog],
     ];
     const changed = new Set();
     COURSES.forEach((course) => {
@@ -2382,7 +2486,8 @@
         const iso = toIsoDate(addDays(monday, i));
         if (iso < todayIso) continue;
         lockedDays.add(iso);
-        (weekPlanMap[iso] || []).forEach((e) => { preUsed[e.k] = (preUsed[e.k] || 0) + (e.h || 0); });
+        // Tehdyksi merkityt osat on jo laskettu valmiusprosenttiin.
+        (weekPlanMap[iso] || []).forEach((e) => { if (!e.done) preUsed[e.k] = (preUsed[e.k] || 0) + (e.h || 0); });
       }
     });
     return { lockedDays, preUsed };
@@ -2414,11 +2519,58 @@
     const [entry] = src.splice(idx, 1);
     if (!entry) return;
     const dst = (weekPlanMap[toIso] = weekPlanMap[toIso] || []);
-    const same = dst.find((e) => e.k === entry.k);
+    const same = dst.find((e) => e.k === entry.k && !!e.done === !!entry.done);
     if (same) same.h = Math.round(((same.h || 0) + (entry.h || 0)) * 10) / 10;
     else dst.push(entry);
     weekPlanMap[fromIso] = src;
     saveWeekPlanMap(weekPlanMap);
+  }
+
+  // Lukitun päivän laatikon tunnit (vähintään 0,5 h).
+  function setLockedEntryHours(iso, idx, hours) {
+    const list = weekPlanMap[iso];
+    if (!isDayLocked(iso) || !list || !list[idx]) return;
+    list[idx].h = Math.max(0.5, Math.round(hours * 10) / 10);
+    saveWeekPlanMap(weekPlanMap);
+  }
+  // Jakaa lukitun päivän laatikon kahdeksi saman päivän laatikoksi, joista
+  // toisen voi sitten raahata toiselle päivälle.
+  function splitLockedEntry(iso, idx) {
+    const list = weekPlanMap[iso];
+    if (!isDayLocked(iso) || !list || !list[idx] || (list[idx].h || 0) < 1) return;
+    const e = list[idx];
+    const first = Math.round((e.h / 2) * 2) / 2 || 0.5;
+    const second = Math.round((e.h - first) * 10) / 10;
+    e.h = first;
+    list.splice(idx + 1, 0, Object.assign({}, e, { h: second }));
+    saveWeekPlanMap(weekPlanMap);
+  }
+  // Merkitsee tallennetun laatikon (lukittu tai mennyt päivä) osan tehdyksi
+  // ja laskee tehtävän valmiusprosentin tehtyjen osien tunneista.
+  function setEntryPartDone(iso, idx, done) {
+    const list = weekPlanMap[iso];
+    if (!list || !list[idx]) return;
+    if (!isDayLocked(iso) && iso >= toIsoDate(today)) return;
+    if (done) list[idx].done = true;
+    else delete list[idx].done;
+    saveWeekPlanMap(weekPlanMap);
+    const key = list[idx].k;
+    const item = allItems.find((it) => itemKey(it.courseId, it) === key);
+    if (item) recomputeProgressFromParts(key, item);
+  }
+  function recomputeProgressFromParts(key, item) {
+    const { hours } = getPlanHoursPace(item);
+    if (!hours) return;
+    let doneHours = 0;
+    Object.values(weekPlanMap).forEach((list) => {
+      (list || []).forEach((e) => { if (e.k === key && e.done) doneHours += e.h || 0; });
+    });
+    progressMap[key] = Math.max(0, Math.min(100, Math.round((doneHours / hours) * 100)));
+    saveProgressMap(progressMap);
+    if (doneHours > 0 && getStatus(item) === "avoin") {
+      statusMap[key] = "kesken";
+      saveStatusMap(statusMap);
+    }
   }
 
   // Avaa viikon lukituksen: sen tulevien päivien tallennetut suunnitelmat
@@ -2639,7 +2791,9 @@
       remainingHint.className = "remaining-hint";
       const updateRemainingHint = () => {
         const { hours } = getPlanHoursPace(item);
-        remainingHint.textContent = hours ? " (jäljellä " + getRemainingHours(item) + " h / " + hours + " h)" : "";
+        const spent = getSpentMinutes(key);
+        remainingHint.textContent = (hours ? " (jäljellä " + getRemainingHours(item) + " h / " + hours + " h)" : "") +
+          (spent >= 1 ? " · käytetty " + fmtDuration(spent) : "");
       };
       updateRemainingHint();
       progressRow.appendChild(remainingHint);
@@ -3908,10 +4062,13 @@
                 item: it || { courseName: e.course || "", color: e.color || "#3b82f6", title: e.title || "" },
                 title: it ? displayTitle(it) : e.title || "",
                 hours: e.h || 0,
-                done: st === "tehty" || st === "ei-tehda",
+                key: e.k,
+                real: !!it,
+                partDone: !!e.done,
+                done: st === "tehty" || st === "ei-tehda" || !!e.done,
               };
             })
-          : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours }));
+          : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours, key: itemKey(e.item.courseId, e.item), real: true }));
         // Lukitun viikon tulevat päivät: laatikoita voi vetää päivästä toiseen.
         const movable = dayLocked;
         if (movable) {
@@ -3949,7 +4106,35 @@
           }
           chip.style.setProperty("--chip-color", e.item.color);
           appendItemLabel(chip, e.item, e.title + " · " + (Math.round(e.hours * 10) / 10) + "h");
-          chip.title = e.item.courseName;
+          chip.title = e.item.courseName + " (avaa klikkaamalla)";
+          if (e.real && effDate(e.item) < iso) {
+            chip.classList.add("past-deadline");
+            chip.title = e.item.courseName + ": tämä päivä on määräajan (" + fmtShort(parseDate(effDate(e.item))) + ") jälkeen";
+          }
+          if (fromSnapshot) {
+            // Pikamerkintä: tämä osa tehty.
+            const check = document.createElement("button");
+            check.type = "button";
+            check.className = "chip-check" + (e.partDone ? " on" : "");
+            check.textContent = "✓";
+            check.title = e.partDone ? "Poista tehty-merkintä tältä osalta" : "Merkitse tämä osa tehdyksi";
+            check.onclick = (ev) => {
+              ev.stopPropagation();
+              setEntryPartDone(iso, entryIdx, !e.partDone);
+              renderWeek();
+            };
+            chip.appendChild(check);
+          }
+          if (e.real && runningTimerKey() === e.key) {
+            chip.classList.add("timing");
+            const tm = document.createElement("span");
+            tm.className = "chip-timer";
+            tm.dataset.key = e.key;
+            tm.innerHTML = icon("clock") + "<span></span>";
+            tm.lastChild.textContent = fmtDuration(getSpentMinutes(e.key));
+            chip.appendChild(tm);
+          }
+          chip.addEventListener("click", () => openChipEditor({ iso, idx: entryIdx, entry: e, editable: dayLocked, fromSnapshot }));
           col.appendChild(chip);
         });
         if (!entries.length && !isPast) {
@@ -3967,6 +4152,111 @@
       }
       grid2.appendChild(col);
     }
+  }
+
+  // Laatikon muokkausikkuna: tunnit, jako kahtia, osan tehty-merkintä ja
+  // ajastin / käytetty aika. Tunnit ja jako vain lukitulla päivällä.
+  let chipEditCtx = null;
+  function openChipEditor(ctx) {
+    chipEditCtx = ctx;
+    const e = ctx.entry;
+    document.getElementById("chipEditTitle").textContent = e.title;
+    const dt = parseDate(ctx.iso);
+    document.getElementById("chipEditSub").textContent =
+      (e.item.courseName || "") + " · " + WEEKDAYS_FI[(dt.getDay() + 6) % 7] + " " + fmtShort(dt);
+    document.getElementById("chipEditPlan").hidden = !ctx.fromSnapshot;
+    document.getElementById("chipEditUnlockedHint").hidden = ctx.fromSnapshot;
+    const hoursInput = document.getElementById("chipEditHours");
+    hoursInput.value = e.hours;
+    hoursInput.disabled = !ctx.editable;
+    document.getElementById("chipEditSplit").disabled = !ctx.editable || e.hours < 1;
+    document.getElementById("chipEditDone").checked = !!e.partDone;
+    document.getElementById("chipEditTimeSection").hidden = !e.real;
+    updateChipEditorDynamic();
+    document.getElementById("chipEditOverlay").hidden = false;
+  }
+  function closeChipEditor() {
+    document.getElementById("chipEditOverlay").hidden = true;
+    chipEditCtx = null;
+    renderWeek();
+  }
+  function updateChipEditorDynamic() {
+    if (!chipEditCtx) return;
+    const e = chipEditCtx.entry;
+    const item = e.real ? e.item : null;
+    const progressEl = document.getElementById("chipEditProgress");
+    if (item && getStatus(item) === "kesken") {
+      const { hours } = getPlanHoursPace(item);
+      progressEl.textContent = "Tehtävästä valmiina " + getProgressPct(item) + " %" + (hours ? " (arvio " + hours + " h)" : "") + ".";
+    } else {
+      progressEl.textContent = "";
+    }
+    if (!e.real) return;
+    const running = runningTimerKey() === e.key;
+    const spent = getSpentMinutes(e.key);
+    document.getElementById("chipEditTimer").textContent = fmtDuration(spent);
+    document.getElementById("chipEditTimerBtn").textContent = running ? "Pysäytä" : "Käynnistä";
+    const spentInput = document.getElementById("chipEditSpent");
+    if (document.activeElement !== spentInput) spentInput.value = Math.round((spent / 60) * 100) / 100;
+    const { hours } = getPlanHoursPace(e.item);
+    document.getElementById("chipEditSpentHint").textContent = hours
+      ? "Arvio " + hours + " h, käytetty " + (Math.round((spent / 60) * 10) / 10) + " h (" + Math.round((spent / 60 / hours) * 100) + " % arviosta)."
+      : "";
+  }
+  function initChipEditor() {
+    document.getElementById("chipEditClose").onclick = closeChipEditor;
+    document.getElementById("chipEditOverlay").addEventListener("click", (ev) => {
+      if (ev.target.id === "chipEditOverlay") closeChipEditor();
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && chipEditCtx) closeChipEditor();
+    });
+    document.getElementById("chipEditHours").onchange = (ev) => {
+      if (!chipEditCtx || !chipEditCtx.editable) return;
+      const v = parseFloat(ev.target.value);
+      if (!Number.isFinite(v) || v <= 0) { ev.target.value = chipEditCtx.entry.hours; return; }
+      setLockedEntryHours(chipEditCtx.iso, chipEditCtx.idx, v);
+      chipEditCtx.entry.hours = Math.max(0.5, Math.round(v * 10) / 10);
+      ev.target.value = chipEditCtx.entry.hours;
+      document.getElementById("chipEditSplit").disabled = chipEditCtx.entry.hours < 1;
+      renderWeek();
+    };
+    document.getElementById("chipEditSplit").onclick = () => {
+      if (!chipEditCtx || !chipEditCtx.editable) return;
+      splitLockedEntry(chipEditCtx.iso, chipEditCtx.idx);
+      closeChipEditor();
+    };
+    document.getElementById("chipEditDone").onchange = (ev) => {
+      if (!chipEditCtx) return;
+      setEntryPartDone(chipEditCtx.iso, chipEditCtx.idx, ev.target.checked);
+      chipEditCtx.entry.partDone = ev.target.checked;
+      updateChipEditorDynamic();
+      renderWeek();
+    };
+    document.getElementById("chipEditTimerBtn").onclick = () => {
+      if (!chipEditCtx) return;
+      const key = chipEditCtx.entry.key;
+      if (runningTimerKey() === key) stopTimer(key);
+      else startTimer(key);
+      updateChipEditorDynamic();
+      renderWeek();
+    };
+    document.getElementById("chipEditSpent").onchange = (ev) => {
+      if (!chipEditCtx) return;
+      const v = parseFloat(String(ev.target.value).replace(",", "."));
+      if (!Number.isFinite(v) || v < 0) return;
+      setSpentMinutes(chipEditCtx.entry.key, v * 60);
+      updateChipEditorDynamic();
+    };
+    // Käynnissä olevan ajastimen näyttö päivittyy sekunnin välein.
+    setInterval(() => {
+      const key = runningTimerKey();
+      if (!key) return;
+      document.querySelectorAll(".chip-timer").forEach((el) => {
+        if (el.lastChild) el.lastChild.textContent = fmtDuration(getSpentMinutes(el.dataset.key));
+      });
+      if (chipEditCtx && chipEditCtx.entry.key === key) updateChipEditorDynamic();
+    }, 1000);
   }
 
   // Palauttaa ne kohteet joiden arvioitu työskentelyjakso (ks.
@@ -4929,6 +5219,7 @@
   }
 
   recordTodayPlan();
+  initChipEditor();
   route();
   setTimeout(checkForUpdates, 1500);
 })();
