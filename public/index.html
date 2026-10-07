@@ -1269,7 +1269,7 @@
         <p>Viikkonäkymä jakaa tehtävien Arvio-tunnit päiville: aikaisin deadline ensin, ja jokainen päivä täytetään sen opiskeluajan verran ennen kuin siirrytään seuraavaan tehtävään.</p>
         <p>Mukana ovat tehtävät, joiden "Aloita viimeistään" -päivä on tänään tai jo mennyt, sekä kaikki "Työn alla" -tehtävät. Tehdyt ja "Ei tehdä" -tehtävät jätetään pois. Työn alla -tehtävän Valmiina-prosentti vähentää jaettavia tunteja, ja tehtävä saa viikossa enintään tahtinsa (h/vko) verran tunteja. Jos tehtävä ei muuten ehtisi valmiiksi ennen määräaikaa, se saa lisätunteja vapaista päivistä.</p>
         <p>Jako lasketaan tästä päivästä eteenpäin, joten se pysyy samana riippumatta siitä, mitä viikkoa selaat. Myöhässä olevat tehtävät saavat tunteja ensimmäisinä. Menneet päivät jäävät näkyviin sellaisina kuin ne suunniteltiin.</p>
-        <p><strong>Lukitse viikko</strong> jäädyttää selattavan viikon suunnitelman: siihen ei lisätä eikä siitä poisteta mitään, vaikka merkitset tehtäviä tehdyksi tai muutat opiskeluaikaa. Tehdyt tehtävät jäävät paikalleen yliviivattuina. Jokaisen viikon voi lukita erikseen, ja lukitsemattomat viikot suunnitellaan lukittujen ympärille. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä, myös menneiltä päiviltä tekemättä jääneitä (keltainen katkoviiva). <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman.</p>
+        <p><strong>Lukitse viikko</strong> jäädyttää selattavan viikon suunnitelman: siihen ei lisätä eikä siitä poisteta mitään, vaikka merkitset tehtäviä tehdyksi tai muutat opiskeluaikaa. Tehdyt tehtävät jäävät paikalleen yliviivattuina. Jokaisen viikon voi lukita erikseen, ja lukitsemattomat viikot suunnitellaan lukittujen ympärille. Lukitun viikon tehtäviä voi siirtää päivästä toiseen vetämällä, myös menneille päiville ja niiltä (tekemättä jääneet menneiden päivien laatikot näkyvät keltaisella katkoviivalla). <strong>Avaa lukitus</strong> palauttaa ajantasaisen suunnitelman.</p>
         <p>Klikkaa laatikkoa avataksesi sen: lukitulla viikolla voit muuttaa laatikon tunteja ja jakaa sen kahtia (osan voi sitten vetää toiselle päivälle). Laatikon ✓ merkitsee osan tehdyksi, ja tehtävän valmiusprosentti lasketaan tehtyjen osien tunneista suhteessa Arvioon. Ajastimella tai syöttämällä näet, paljonko aikaa tehtävään on oikeasti mennyt verrattuna Arvioon.</p>
         <p><strong>Jako</strong> määrää, painottuuko viikon työ alkuviikolle, viikonlopulle vai tasaisesti kaikille päiville opiskeluajan suhteessa. Tehtävän viikkotunnit ja määräajat pysyvät samoina, vain päivä vaihtuu. <strong>Sekoita aiheita</strong> vuorottelee eri kurssien tehtäviä tunnin paloissa sen sijaan, että tehtävä tehtäisiin kerralla loppuun.</p>
         <p>Päivän "Ei opiskella" -painike nollaa kyseisen päivän opiskeluajan, esimerkiksi jos sinulla on muuta menoa.</p>
@@ -1362,7 +1362,7 @@
         </div>
         <p class="field-hint" id="chipEditProgress"></p>
       </div>
-      <p class="field-hint" id="chipEditUnlockedHint" hidden>Lukitse viikko, niin voit muuttaa laatikon tunteja, jakaa sen kahtia ja merkitä osia tehdyksi.</p>
+      <p class="field-hint" id="chipEditUnlockedHint" hidden>Lukitse viikko, niin voit muuttaa laatikon tunteja, jakaa sen kahtia ja merkitä osia tehdyksi. Menneiden päivien laatikoita voi muokata aina.</p>
       <div id="chipEditTimeSection">
         <h4 class="chip-edit-heading">Käytetty aika</h4>
         <div class="chip-timer-row">
@@ -2513,14 +2513,16 @@
 
   // Siirtää lukitun viikon laatikon päivästä toiseen (raahaus). Saman
   // tehtävän tunnit yhdistetään, jos kohdepäivässä on jo sama tehtävä.
+  // Muokattava päivä = tallennettu päivä: mennyt päivä tai lukitun viikon
+  // päivä. Niiden laatikoita voi siirtää, jakaa ja muuttaa.
+  function isEditableDay(iso) {
+    return iso < toIsoDate(today) || isDayLocked(iso);
+  }
   function moveLockedEntry(fromIso, idx, toIso) {
     if (fromIso === toIso) return;
-    // Lähde: lukittu päivä tai mennyt päivä (tekemättä jäänyt osa siirretään
-    // eteenpäin). Kohde: aina lukittu päivä.
-    const fromPast = fromIso < toIsoDate(today);
-    if ((!fromPast && !isDayLocked(fromIso)) || !isDayLocked(toIso)) return;
+    if (!isEditableDay(fromIso) || !isEditableDay(toIso)) return;
     const src = weekPlanMap[fromIso] || [];
-    if (!src[idx] || (fromPast && src[idx].done)) return;
+    if (!src[idx]) return;
     const [entry] = src.splice(idx, 1);
     const dst = (weekPlanMap[toIso] = weekPlanMap[toIso] || []);
     const same = dst.find((e) => e.k === entry.k && !!e.done === !!entry.done);
@@ -2533,7 +2535,7 @@
   // Lukitun päivän laatikon tunnit (vähintään 0,5 h).
   function setLockedEntryHours(iso, idx, hours) {
     const list = weekPlanMap[iso];
-    if (!isDayLocked(iso) || !list || !list[idx]) return;
+    if (!isEditableDay(iso) || !list || !list[idx]) return;
     list[idx].h = Math.max(0.5, Math.round(hours * 10) / 10);
     saveWeekPlanMap(weekPlanMap);
   }
@@ -2541,7 +2543,7 @@
   // toisen voi sitten raahata toiselle päivälle.
   function splitLockedEntry(iso, idx) {
     const list = weekPlanMap[iso];
-    if (!isDayLocked(iso) || !list || !list[idx] || (list[idx].h || 0) < 1) return;
+    if (!isEditableDay(iso) || !list || !list[idx] || (list[idx].h || 0) < 1) return;
     const e = list[idx];
     const first = Math.round((e.h / 2) * 2) / 2 || 0.5;
     const second = Math.round((e.h - first) * 10) / 10;
@@ -4031,7 +4033,7 @@
 
       const dayLocked = locked && !isPast;
       // Lukittu päivä näytetään aina tallennettuna, "Ei opiskella" ei koske sitä.
-      const dayOff = noStudySet.has(iso) && !dayLocked;
+      const dayOff = noStudySet.has(iso) && !dayLocked && !isPast;
       if (!isPast && !dayLocked) {
         const toggle = document.createElement("button");
         toggle.type = "button";
@@ -4074,7 +4076,9 @@
             })
           : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours, key: itemKey(e.item.courseId, e.item), real: true }));
         // Lukitun viikon tulevat päivät: laatikoita voi vetää päivästä toiseen.
-        const movable = dayLocked;
+        // Menneet ja lukitut päivät ovat tallennettuja: niiden välillä voi
+        // siirtää laatikoita vapaasti (myös takaisin menneille päiville).
+        const movable = dayLocked || isPast;
         if (movable) {
           col.addEventListener("dragover", (ev) => {
             ev.preventDefault();
@@ -4101,9 +4105,9 @@
           chip.className = "week-chip" + (e.done ? " done" : "");
           // Menneen päivän tekemättä jäänyt osa voidaan vetää lukitun viikon
           // tulevalle päivälle.
-          const draggable = movable || (isPast && locked && fromSnapshot && !e.done);
+          const draggable = movable;
+          if (isPast && !e.done) chip.classList.add("missed");
           if (draggable) {
-            if (!movable) chip.classList.add("missed");
             chip.draggable = true;
             chip.addEventListener("dragstart", (ev) => {
               ev.dataTransfer.setData("text/plain", JSON.stringify({ from: iso, idx: entryIdx }));
@@ -4143,7 +4147,7 @@
             tm.lastChild.textContent = fmtDuration(getSpentMinutes(e.key));
             chip.appendChild(tm);
           }
-          chip.addEventListener("click", () => openChipEditor({ iso, idx: entryIdx, entry: e, editable: dayLocked, fromSnapshot }));
+          chip.addEventListener("click", () => openChipEditor({ iso, idx: entryIdx, entry: e, editable: dayLocked || isPast, fromSnapshot }));
           col.appendChild(chip);
         });
         if (!entries.length && !isPast) {

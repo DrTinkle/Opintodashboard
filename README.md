@@ -130,7 +130,7 @@ uudelleen.
   **Lukitse viikko** jäädyttää selattavan viikon: siihen ei lisätä eikä
   siitä poisteta mitään, tehdyksi merkitty tehtävä jää paikalleen
   yliviivattuna, ja tehtäviä voi siirtää päivästä toiseen vetämällä
-  (myös menneiltä päiviltä tekemättä jääneitä).
+  (myös menneille päiville ja niiltä).
   Jokaisen viikon voi lukita erikseen. **Avaa lukitus** palauttaa
   ajantasaisen suunnitelman. Klikkaamalla laatikkoa voit lukitulla
   viikolla muuttaa sen tunteja tai jakaa sen kahtia, merkitä osan
