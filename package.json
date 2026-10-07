@@ -1,6 +1,6 @@
 {
   "name": "opintodashboard",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Paikallinen opintodashboard SAMKin Moodlelle: deadlinet, kalenteri, viikkosuunnitelma ja vienti Google-kalenteriin.",
   "private": true,
   "engines": {

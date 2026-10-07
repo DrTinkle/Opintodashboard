@@ -304,7 +304,8 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     lukitsemattomat viikot suunnitellaan lukittujen ympärille. Jos uusi
     tehtävä ei mahdu lukitsemattomiin päiviin ennen määräaikaa, se näkyy
     varoituksena. Lukitun viikon laatikoita voi raahata päivästä toiseen
-    (`moveLockedEntry()`). Lukituksen avaus poistaa viikon tulevien
+    (`moveLockedEntry()`), myös lukitun viikon menneiltä päiviltä
+    tekemättä jääneitä (ei `done`) tuleville lukituille päiville. Lukituksen avaus poistaa viikon tulevien
     päivien tilannekuvat.
   - **Laatikon muokkaus** (`openChipEditor()`): lukitun päivän laatikon
     tunteja voi muuttaa (`setLockedEntryHours()`) ja sen voi jakaa kahtia
