@@ -169,7 +169,8 @@ Ajastin (1620-1648): `getSpentMinutes(key)`, `runningTimerKey()`,
 | 1900 | `getEffectiveExamChoice(courseId)` | Käyttäjän valinta tai oletus |
 | 1910 | `isExamSystemItem(item)` | Onko EXAM-järjestelmän tentti (ikkuna + valinta) |
 | 1919 | `getExamAvailability(courseId, iso)` | Kuinka suuri osa ikkunasta on jo varattavissa (`EXAM_BOOKING_HORIZON_DAYS`) |
-| 1956 | `getExamOverride(item)` | Varattu EXAM-päivä korvaa paperitentin päivän |
+| 1956 | `getExamOverride(item)` | Varattu EXAM-päivä: päivä, otsikko "EXAM-tentti", ei ikkunatietoja |
+| 1915 | `isUnbookedExamWindow(item)` | EXAM-tentti ilman varattua päivää: vain näille varausikkuna ja varattavuus |
 
 ### JS: viikkosuunnitelma (`#viikko`)
 

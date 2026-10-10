@@ -1910,6 +1910,11 @@
   function isExamSystemItem(item) {
     return !!(item.examWindowStart && item.examWindowEnd && getEffectiveExamChoice(item.courseId) === "exam-system");
   }
+  // Varaamaton EXAM-tentti: vain näille näytetään varausikkuna ja
+  // varattavuustiedot. Varatun päivän jälkeen tentti on tavallinen päivä.
+  function isUnbookedExamWindow(item) {
+    return isExamSystemItem(item) && !getExamOverride(item);
+  }
 
   // EXAM-järjestelmässä ajan voi varata vain n. EXAM_BOOKING_HORIZON_DAYS
   // vuorokautta etukäteen, joten vaikka koko ikkuna olisi tiedossa, kaikki
@@ -1947,22 +1952,19 @@
     };
   }
 
-  // Jos kurssilla on seka paperi-/luokkatentti etta vaihtoehtoinen
-  // EXAM-ikkuna (examWindowEnd asetettu deadline-datassa), ja EXAM-aika on
-  // varattu kurssin Tentti-widgetissa, oletetaan etta EXAM korvaa
-  // paperitentin kokonaan - paperitenttia ei oletettavasti tehda. Silloin
-  // deadline-listalla nakyy alkuperaisen luokkatenttipaivan sijaan varattu
-  // EXAM-paiva.
+  // Kun kurssin EXAM-aika on varattu (Tentti-widget), kurssin EXAM-ikkunalliset
+  // tentit muuttuvat varatuiksi EXAM-päiviksi: päivä on varattu päivä, otsikko
+  // "EXAM-tentti" ja varausikkunan tiedot (alkuperäiset muistiinpanot,
+  // varattavuustekstit, kalenterin ikkunapalkit) jäävät pois. Myös
+  // paperitentin vaihtoehtona ollut EXAM korvaa paperitentin.
   function getExamOverride(item) {
     if (!item.examWindowEnd) return null;
     const info = examMap[item.courseId] || {};
-    if (info.type === "exam-system" && info.examDate) {
+    if (info.examDate && getEffectiveExamChoice(item.courseId) === "exam-system") {
       return {
         date: info.examDate,
-        title: item.title + " — EXAM varattu",
-        notes:
-          "EXAM varattu " + fmtDate(parseDate(info.examDate)) + ". Paperitenttiä ei oletettavasti tehdä." +
-          (item.notes ? " " + item.notes : ""),
+        title: "EXAM-tentti",
+        notes: "EXAM varattu " + fmtDate(parseDate(info.examDate)),
       };
     }
     return null;
@@ -2805,7 +2807,7 @@
       progressRow.appendChild(remainingHint);
       titleCell.appendChild(progressRow);
     }
-    if (isExamSystemItem(item) && !getExamOverride(item)) {
+    if (isUnbookedExamWindow(item)) {
       const avail = getExamAvailability(item.courseId, item.examWindowEnd);
       const availNote = document.createElement("div");
       availNote.className = "notes exam-avail-note exam-avail-" + avail.status;
@@ -3321,7 +3323,7 @@
     });
     wrap.appendChild(typeRow);
 
-    if (usingDefaultType) {
+    if (usingDefaultType && !info.examDate) {
       const typeHint = document.createElement("div");
       typeHint.className = "field-hint";
       typeHint.textContent =
@@ -3354,7 +3356,8 @@
         refresh();
       };
       bookByLabel.appendChild(bookByInput);
-      datesRow.appendChild(bookByLabel);
+      // Varauksen jälkeen "suoritettava viimeistään" on turha varausinfo.
+      if (!info.examDate) datesRow.appendChild(bookByLabel);
 
       const examDateLabel = document.createElement("label");
       examDateLabel.appendChild(document.createTextNode("Varattu EXAM-päivä"));
@@ -3382,7 +3385,7 @@
         const diff = daysBetween(today, examD);
         hint.textContent =
           "Oma EXAM-aika varattu: " + fmtDate(examD) + " (" + urgencyText(diff) + "). " +
-          "Tämä korvaa listalla mahdollisen paperitentin päivämäärän — paperitenttiä ei oletettavasti tehdä.";
+          "Kurssin EXAM-tentti näkyy listoilla ja kalentereissa tänä päivänä, eikä varausikkunaa enää näytetä.";
       } else if (effectiveBookBy) {
         const bookByDate = parseDate(effectiveBookBy);
         const diff = daysBetween(today, bookByDate);
@@ -3681,8 +3684,7 @@
     const bars = [];
     allItems.forEach((it) => {
       if (!isVisible(it)) return;
-      if (!isExamSystemItem(it)) return;
-      if (getExamOverride(it)) return;
+      if (!isUnbookedExamWindow(it)) return;
       const windowStart = parseDate(it.examWindowStart);
       const windowEnd = parseDate(it.examWindowEnd);
       const avail = getExamAvailability(it.courseId, it.examWindowEnd);

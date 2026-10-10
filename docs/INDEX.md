@@ -264,7 +264,11 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
 ## Laskentalogiikka
 
 - **Tehokas päivämäärä** (`effDate()`): deadlinen päivä, tai varattu
-  EXAM-päivä, jos se on merkitty kurssin Tentti-laatikkoon.
+  EXAM-päivä, jos se on merkitty kurssin Tentti-laatikkoon. Varattu päivä
+  (`getExamOverride()`) muuttaa kurssin EXAM-ikkunalliset tentit
+  "EXAM-tentti"-päiviksi: varausikkunaa, varattavuustekstejä, kalenterin
+  ikkunapalkkeja ja "suoritettava viimeistään" -kenttää ei enää näytetä
+  (`isUnbookedExamWindow()`).
 - **Arvio ja tahti** (`getPlanHoursPace()`): käsin syötetty arvo
   (`plan_v1`) ensin, muuten `data.json`:in `estimatedHours`/`estimatedPace`.
   Kaikki laskenta käyttää tätä funktiota.
