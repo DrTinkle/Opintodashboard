@@ -22,6 +22,9 @@ public/data.js
 # Vianetsinnän HTML-tallenteet: sisältävät nimen, kurssit ja istuntotietoja
 debug/
 
+# Ylläpitäjän oma AI-handoff (Claude Code lukee automaattisesti)
+CLAUDE.local.md
+
 # --- Varmuuden vuoksi myös vanhan rakenteen tiedostot juuressa ---------------
 # (npm start / npm run setup siirtää nämä data/-kansioon)
 /data.json

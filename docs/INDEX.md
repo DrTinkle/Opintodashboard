@@ -1,8 +1,9 @@
 # Tekninen hakemisto
 
 Tämä dokumentti kuvaa, miten Opintodashboard on rakennettu. Käyttöohjeet
-ovat [README.md](../README.md):ssä ja koodin muokkaamisen säännöt
-[AGENTS.md](../AGENTS.md):ssä.
+ovat [README.md](../README.md):ssä, koodin muokkaamisen säännöt
+[AGENTS.md](../AGENTS.md):ssä ja funktiotason hakemisto
+[CODE_INDEX.md](CODE_INDEX.md):ssä.
 
 ## Sisältö
 
@@ -56,7 +57,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 
 ```
 .
-├── README.md, AGENTS.md, package.json, .env.example
+├── README.md, AGENTS.md, CLAUDE.md, package.json, .env.example
 ├── setup.bat, setup.sh          käyttöönotto (Windows / macOS, Linux)
 ├── kaynnista.bat, paivita.bat   käynnistys ja päivitys Windowsissa
 ├── .env                         omat asetukset (ei gitissä)
@@ -68,7 +69,7 @@ Moodle ──(skriptit / Hae Moodlesta)──▶ data/data.json ──(build)─
 │   └── ...                      omat tiedot (ei gitissä, ks. alla)
 ├── debug/                       vianetsinnän HTML-tallenteet (ei gitissä)
 ├── docs/
-│   ├── INDEX.md, google-kalenteri.md
+│   ├── INDEX.md, CODE_INDEX.md, google-kalenteri.md
 │   └── images/                  README:n kuvakaappaukset
 └── src/
     ├── paths.js, load_env.js, build.js, setup.js, server.js

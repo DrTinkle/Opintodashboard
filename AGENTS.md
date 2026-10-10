@@ -135,4 +135,9 @@ Ennen committia:
 - `README.md` on lyhyt käyttöohje luokkalaisille. Pidä se lyhyenä.
 - Tekniset yksityiskohdat kuuluvat `docs/INDEX.md`:hen, Google-ohje
   `docs/google-kalenteri.md`:hen.
+- `docs/CODE_INDEX.md` on tiedosto- ja funktiotason hakemisto. Kun lisäät,
+  poistat tai nimeät uudelleen funktion tai tiedoston, päivitä se.
+- `CLAUDE.md` on Claude Coden aloituspiste (tuo tämän tiedoston).
+  `CLAUDE.local.md` on ylläpitäjän oma handoff-tiedosto, eikä se ole
+  gitissä.
 - Päivitä ne samassa commitissa, jossa toiminta muuttuu.
