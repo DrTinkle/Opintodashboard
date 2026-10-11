@@ -107,7 +107,9 @@ Kapeat näytöt (1124).
 | 1748 | `daysBetween(a, b)` | Päiviä kahden päivän välillä |
 | 1757 | `setProgressLabel(el, l, r)` | Edistymispalkin kaksiosainen nimiö |
 | 1767 | `addDays(d, n)` | Kesäaikaturvallinen päivien lisäys (käytä aina tätä) |
-| 1771 | `fmtDate(d)` | Pitkä suomalainen päivämäärä |
+| 1771 | `fmtDate(d)` | Viikonpäivä + päivä: `pe 23.10.` |
+| 1774 | `fmtDateFull(d)`, `fmtIso(iso)` | `23.10.2026`; `fmtIso` muuttaa ISO-päivän (`2026-10-23`) suomalaiseksi |
+| 1790 | `parseFiDate(text)`, `dateFieldFor(input)`, `createDateInput()` | Suomalainen päivämääräkenttä (pp.kk.vvvv + kalenterinappi), `.value` on ISO |
 | 2122 | `toIsoDate(d)` | `Date` → `YYYY-MM-DD` |
 | 2160 | `fmtShort(d)` | `5.10.` |
 | 1648 | `fmtDuration(min)` | Minuutit → `1:30` |

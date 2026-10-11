@@ -739,12 +739,28 @@
   .exam-widget .exam-type-row input[type="radio"] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
   .exam-widget .exam-dates-row { display: flex; flex-wrap: wrap; gap: 18px; }
   .exam-widget .exam-dates-row label { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
-  .exam-widget input[type="date"] {
-    height: 34px; padding: 0 10px;
+  .exam-widget input.date-text {
+    height: 34px; padding: 0 10px; width: 130px;
     border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
     background: var(--card-bg); color: var(--text); font: inherit; font-size: 0.85rem;
   }
-  .exam-widget input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+  .exam-widget input.date-text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+
+  /* Suomalainen päivämääräkenttä (pp.kk.vvvv) ja kalenterinappi */
+  .date-field { position: relative; display: inline-flex; align-items: center; width: 100%; }
+  .exam-widget .date-field { width: auto; }
+  .date-field input.date-text { padding-right: 34px; }
+  .date-field .date-pick-btn {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-dim); cursor: pointer;
+  }
+  .date-field .date-pick-btn:hover { background: var(--bg-soft); color: var(--text); }
+  .date-field .date-pick-btn .icon { width: 16px; height: 16px; }
+  .date-field .date-native { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+  input.date-invalid, .modal-box .field-label input.date-invalid, .exam-widget input.date-text.date-invalid {
+    border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-bg);
+  }
   .exam-widget .exam-hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 12px; line-height: 1.55; }
   .exam-widget .exam-hint.overdue { color: var(--danger); font-weight: 600; }
   .exam-widget input.is-estimate { border-style: dashed; color: var(--text-dim); }
@@ -1396,7 +1412,7 @@
         </p>
         <div class="field-row">
           <label class="field-label">Määräaika
-            <input type="date" id="taskFormDate" required>
+            <input type="text" id="taskFormDate" required>
           </label>
           <label class="field-label">Tyyppi
             <select id="taskFormType"></select>
@@ -1444,6 +1460,7 @@
     "award": '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4 7.5 21l4.5-2.6 4.5 2.6-1.1-7.6"/>',
     "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     "flag": '<path d="M5 21V4"/><path d="M5 4h11l-2 4.5L16 13H5"/>',
+    "calendar": '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
   };
   function icon(name) {
     return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (ICON_PATHS[name] || "") + "</svg>";
@@ -1770,6 +1787,98 @@
 
   function fmtDate(dt) {
     return dt.toLocaleDateString("fi-FI", { weekday: "short", day: "numeric", month: "numeric" });
+  }
+  // Päivä ja vuosi suomalaisittain: 23.10.2026.
+  function fmtDateFull(dt) {
+    return dt.toLocaleDateString("fi-FI", { day: "numeric", month: "numeric", year: "numeric" });
+  }
+  // ISO-päivä (2026-10-23) -> 23.10.2026. Muun tekstin palauttaa sellaisenaan.
+  function fmtIso(iso) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(iso || "")) ? fmtDateFull(parseDate(iso)) : String(iso || "");
+  }
+
+  // Päivämääräkentät. Natiivi <input type="date"> näyttää päivän selaimen
+  // kielen mukaan (englanniksi kk/pp/vvvv), joten käytetään tekstikenttää
+  // muodossa pp.kk.vvvv. Kentän .value on silti aina ISO-muodossa
+  // (YYYY-MM-DD) tai "", jos kenttä on tyhjä tai virheellinen, joten muu
+  // koodi toimii kuten ennen. Vuoden voi jättää pois (oletus kuluva vuosi).
+  const nativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  function parseFiDate(text) {
+    const t = String(text || "").trim();
+    if (!t) return "";
+    let y, mo, d;
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) {
+      y = +m[1]; mo = +m[2]; d = +m[3];
+    } else {
+      m = t.match(/^(\d{1,2})[.\/\s-]+(\d{1,2})(?:[.\/\s-]+(\d{2}|\d{4}))?\.?$/);
+      if (!m) return null;
+      d = +m[1]; mo = +m[2];
+      y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : today.getFullYear();
+    }
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return toIsoDate(dt);
+  }
+  // Muuttaa tekstikentän suomalaiseksi päivämääräkentäksi ja palauttaa
+  // elementin, joka (kenttä + kalenterinappi) pitää liittää sivulle.
+  function dateFieldFor(input) {
+    input.type = "text";
+    input.inputMode = "numeric";
+    input.autocomplete = "off";
+    input.placeholder = "pp.kk.vvvv";
+    input.classList.add("date-text");
+    Object.defineProperty(input, "value", {
+      get() {
+        const iso = parseFiDate(nativeValue.get.call(input));
+        return iso || "";
+      },
+      set(v) {
+        nativeValue.set.call(input, v ? fmtIso(v) : "");
+        input.classList.remove("date-invalid");
+      },
+    });
+    input.addEventListener("change", () => {
+      const raw = nativeValue.get.call(input);
+      const iso = parseFiDate(raw);
+      if (iso) {
+        nativeValue.set.call(input, fmtIso(iso));
+        input.classList.remove("date-invalid");
+      } else {
+        input.classList.toggle("date-invalid", !!raw.trim());
+      }
+    });
+    const wrap = document.createElement("span");
+    wrap.className = "date-field";
+    const pick = document.createElement("input");
+    pick.type = "date";
+    pick.className = "date-native";
+    pick.tabIndex = -1;
+    pick.setAttribute("aria-hidden", "true");
+    pick.onchange = () => {
+      if (!pick.value) return;
+      input.value = pick.value;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "date-pick-btn";
+    btn.title = "Valitse päivä kalenterista";
+    btn.setAttribute("aria-label", "Valitse päivä kalenterista");
+    btn.innerHTML = icon("calendar");
+    btn.onclick = () => {
+      pick.value = input.value || "";
+      if (pick.showPicker) { try { pick.showPicker(); } catch (e) { /* ei tuettu */ } }
+    };
+    wrap.appendChild(input);
+    wrap.appendChild(btn);
+    wrap.appendChild(pick);
+    return wrap;
+  }
+  function createDateInput() {
+    const input = document.createElement("input");
+    const wrap = dateFieldFor(input);
+    return { input, wrap };
   }
 
   // Päivitetään refresh():ssä, jotta yön yli auki ollut sivu ei jää eiliseen.
@@ -3133,7 +3242,7 @@
 
         const progLabel = document.createElement("div");
         progLabel.className = "progress-label";
-        setProgressLabel(progLabel, status, course.start.slice(5) + " – " + course.end.slice(5));
+        setProgressLabel(progLabel, status, fmtShort(start) + " – " + fmtShort(end));
         card.appendChild(progLabel);
       }
 
@@ -3337,8 +3446,7 @@
 
       const bookByLabel = document.createElement("label");
       bookByLabel.appendChild(document.createTextNode("Suoritettava viimeistään"));
-      const bookByInput = document.createElement("input");
-      bookByInput.type = "date";
+      const { input: bookByInput, wrap: bookByWrap } = createDateInput();
       const usingDefaultBookBy = info.bookBy == null && defaultBookBy != null;
       if (info.bookBy != null) bookByInput.value = info.bookBy;
       else if (defaultBookBy) bookByInput.value = defaultBookBy;
@@ -3355,14 +3463,13 @@
         saveExamMap(examMap);
         refresh();
       };
-      bookByLabel.appendChild(bookByInput);
+      bookByLabel.appendChild(bookByWrap);
       // Varauksen jälkeen "suoritettava viimeistään" on turha varausinfo.
       if (!info.examDate) datesRow.appendChild(bookByLabel);
 
       const examDateLabel = document.createElement("label");
       examDateLabel.appendChild(document.createTextNode("Varattu EXAM-päivä"));
-      const examDateInput = document.createElement("input");
-      examDateInput.type = "date";
+      const { input: examDateInput, wrap: examDateWrap } = createDateInput();
       if (info.examDate) examDateInput.value = info.examDate;
       examDateInput.onchange = () => {
         examMap[course.id] = Object.assign({}, examMap[course.id], {
@@ -3372,7 +3479,7 @@
         saveExamMap(examMap);
         refresh();
       };
-      examDateLabel.appendChild(examDateInput);
+      examDateLabel.appendChild(examDateWrap);
       datesRow.appendChild(examDateLabel);
 
       wrap.appendChild(datesRow);
@@ -3446,7 +3553,7 @@
 
       const progLabel = document.createElement("div");
       progLabel.className = "progress-label";
-      setProgressLabel(progLabel, status, course.start + " – " + course.end);
+      setProgressLabel(progLabel, status, fmtDateFull(start) + " – " + fmtDateFull(end));
       header.appendChild(progLabel);
     }
 
@@ -4829,6 +4936,13 @@
     taskFormState = null;
   }
 
+  // Lomakkeen päivämääräkenttä suomalaiseksi (pp.kk.vvvv + kalenterinappi).
+  (function initTaskFormDate() {
+    const input = document.getElementById("taskFormDate");
+    const parent = input.parentNode;
+    parent.appendChild(dateFieldFor(input));
+  })();
+
   document.getElementById("taskForm").onsubmit = (e) => {
     e.preventDefault();
     if (!taskFormState) return;
@@ -4843,7 +4957,13 @@
     const hoursVal = document.getElementById("taskFormHours").value;
     const paceVal = document.getElementById("taskFormPace").value;
 
-    if (!titleVal || !dateVal) return;
+    if (!dateVal) {
+      const dateEl = document.getElementById("taskFormDate");
+      dateEl.classList.add("date-invalid");
+      dateEl.focus();
+      return;
+    }
+    if (!titleVal) return;
 
     if (mode === "create") {
       const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -4972,7 +5092,7 @@
         (c.error ? " (virhe: " + c.error + ")" : "")
     );
     (s.moved || []).forEach((m) => {
-      lines.push(m.courseName + ": " + m.title + " siirtyi " + m.from + " → " + m.to);
+      lines.push(m.courseName + ": " + m.title + " siirtyi " + fmtIso(m.from) + " → " + fmtIso(m.to));
     });
     if (errors.length) lines.push("", "Virheet:", ...errors);
     if (isWarn) lines.push("", "Yksityiskohdat: data/sync_report.json");
@@ -5029,7 +5149,7 @@
         if (s.newTasks.length) {
           detail +=
             "Uudet tehtävät:\n" +
-            s.newTasks.map((t) => "- [" + t.courseName + "] " + t.title + " (" + t.date + ")").join("\n") + "\n\n";
+            s.newTasks.map((t) => "- [" + t.courseName + "] " + t.title + " (" + fmtIso(t.date) + ")").join("\n") + "\n\n";
         }
         if (s.catalogFilled && s.catalogFilled.length) {
           detail += "Kurssitiedot täydennetty opinto-oppaasta:\n" + s.catalogFilled.map((c) => "- " + c.name).join("\n");

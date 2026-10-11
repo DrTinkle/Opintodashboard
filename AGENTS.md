@@ -61,6 +61,11 @@ yksityiskohdat.
   `getTime() + n * 86400000`:lla (kesäaika siirtää tuloksen edelliselle
   päivälle). Moodlen ja opinto-oppaan tekstit ovat epäluotettavia: aseta ne
   `textContent`:lla, älä `innerHTML`:llä.
+- **Päivämäärien näyttö:** näytä päivät aina suomalaisittain (päivä ensin):
+  `fmtDate()`, `fmtShort()`, `fmtDateFull()` tai `fmtIso()`. Älä näytä
+  ISO-päivää (`2026-10-23`) sellaisenaan. Älä käytä `<input type="date">`:a,
+  koska se näyttää päivän selaimen kielellä (englanniksi kk/pp/vvvv): käytä
+  `createDateInput()` / `dateFieldFor()`, jonka `.value` on silti ISO.
 - **Tiedostojen kirjoitus:** kirjoita `data.json` `json_file.js`:n
   `readData()`/`writeData()`:lla (atominen, tarkistaa ettei tiedostoa ole
   muokattu välissä) ja muut tilatiedostot `writeJsonAtomic()`:lla.
