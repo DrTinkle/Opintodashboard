@@ -1378,7 +1378,7 @@
         </div>
         <p class="field-hint" id="chipEditProgress"></p>
       </div>
-      <p class="field-hint" id="chipEditUnlockedHint" hidden>Lukitse viikko, niin voit muuttaa laatikon tunteja, jakaa sen kahtia ja merkitä osia tehdyksi. Menneiden päivien laatikoita voi muokata aina.</p>
+      <p class="field-hint" id="chipEditUnlockedHint" hidden>Lukitse viikko, niin voit muuttaa laatikon tunteja ja jakaa sen kahtia. Menneiden päivien laatikoita voi muokata aina. Osan voi merkitä tehdyksi laatikon ✓-napilla myös etukäteen.</p>
       <div id="chipEditTimeSection">
         <h4 class="chip-edit-heading">Käytetty aika</h4>
         <div class="chip-timer-row">
@@ -2296,7 +2296,7 @@
       for (let d = segStart; d < segEnd; d = addDays(d, 1)) {
         const iso = toIsoDate(d);
         const wd = (d.getDay() + 6) % 7;
-        const cap = noStudySet.has(iso) || lockedDays.has(iso) ? 0 : capacityArr[wd] || 0;
+        const cap = noStudySet.has(iso) || lockedDays.has(iso) ? 0 : Math.max(0, (capacityArr[wd] || 0) - doneHoursOn(iso));
         days.push({ iso, date: d, cap: Math.round(cap * 10) });
       }
       redistributeSegment(perDay, days);
@@ -2504,6 +2504,18 @@
       });
     }
 
+    // Tästä päivästä eteenpäin tehdyksi merkityt osat (myös etukäteen tehdyt)
+    // kuluttavat viikon tahtia.
+    const startIso = toIsoDate(start);
+    Object.keys(weekPlanMap).forEach((iso) => {
+      if (iso < startIso || lockedDays.has(iso)) return;
+      const wk = weekKeyOf(parseDate(iso));
+      doneEntriesOn(iso).forEach((e) => {
+        const t = byKey.get(e.k);
+        if (t) t.weekUsed[wk] = (t.weekUsed[wk] || 0) + (e.h || 0);
+      });
+    });
+
     // Horisontti ulottuu vähintään myöhäisimpään määräaikaan asti, koska
     // tahtiraja voi levittää työn pitkälle ajalle.
     const latest = schedulable.reduce((m, t) => Math.max(m, daysBetween(start, t.deadline) + 1), 0);
@@ -2516,7 +2528,9 @@
       const iso = toIsoDate(day);
       const wk = weekKeyOf(day);
       const wd = (day.getDay() + 6) % 7; // ma=0 ... su=6
-      let capLeft = noStudySet.has(iso) || lockedDays.has(iso) ? 0 : capacityArr[wd] || 0;
+      let capLeft = noStudySet.has(iso) || lockedDays.has(iso)
+        ? 0
+        : Math.max(0, Math.round(((capacityArr[wd] || 0) - doneHoursOn(iso)) * 10) / 10);
       for (const task of schedulable) {
         if (capLeft <= 0) break;
         if (task.remaining <= 0) continue;
@@ -2588,6 +2602,15 @@
   function isDayLocked(iso) {
     return iso >= toIsoDate(today) && isWeekLocked(weekMondayIso(iso));
   }
+  // Tehdyksi merkityt osat (✓) tallennetaan weekPlanMapiin myös lukitsemattomille
+  // päiville (esim. etukäteen tehty työ). Ne vievät päivän kapasiteettia ja
+  // viikon tahtia, mutta eivät jäljellä olevaa työtä (se on jo valmiusprosentissa).
+  function doneHoursOn(iso) {
+    return (weekPlanMap[iso] || []).reduce((sum, e) => sum + (e.done ? e.h || 0 : 0), 0);
+  }
+  function doneEntriesOn(iso) {
+    return (weekPlanMap[iso] || []).filter((e) => e.done);
+  }
   function getLockedPlan() {
     const lockedDays = new Set();
     const preUsed = {};
@@ -2615,7 +2638,7 @@
     for (let i = 0; i < 7; i++) {
       const iso = toIsoDate(addDays(monday, i));
       if (iso < todayIso) continue;
-      weekPlanMap[iso] = planSnapshot(perDay[iso]);
+      weekPlanMap[iso] = doneEntriesOn(iso).concat(planSnapshot(perDay[iso]));
     }
     weekLockMap[mondayIso] = todayIso;
     saveWeekPlanMap(weekPlanMap);
@@ -2667,13 +2690,32 @@
   function setEntryPartDone(iso, idx, done) {
     const list = weekPlanMap[iso];
     if (!list || !list[idx]) return;
-    if (!isDayLocked(iso) && iso >= toIsoDate(today)) return;
-    if (done) list[idx].done = true;
-    else delete list[idx].done;
-    saveWeekPlanMap(weekPlanMap);
     const key = list[idx].k;
+    const editable = isEditableDay(iso);
+    if (done) list[idx].done = true;
+    else if (editable) delete list[idx].done;
+    else list.splice(idx, 1); // lukitsemattoman päivän tehty-laatikko katoaa
+    if (!list.length && !editable) delete weekPlanMap[iso];
+    saveWeekPlanMap(weekPlanMap);
     const item = allItems.find((it) => itemKey(it.courseId, it) === key);
     if (item) recomputeProgressFromParts(key, item);
+    if (!editable) recordTodayPlan();
+  }
+  // Merkitsee lasketun (lukitsemattoman) päivän laatikon tehdyksi: se
+  // tallennetaan tehty-merkittynä, ja loput päivästä lasketaan sen ympärille.
+  function markPlannedEntryDone(iso, entry) {
+    const list = (weekPlanMap[iso] = weekPlanMap[iso] || []);
+    list.push({
+      k: entry.key,
+      h: entry.hours,
+      title: entry.title,
+      course: entry.item.courseName,
+      color: entry.item.color,
+      done: true,
+    });
+    saveWeekPlanMap(weekPlanMap);
+    recomputeProgressFromParts(entry.key, entry.item);
+    recordTodayPlan();
   }
   function recomputeProgressFromParts(key, item) {
     const { hours } = getPlanHoursPace(item);
@@ -2699,7 +2741,12 @@
     const todayIso = toIsoDate(today);
     for (let i = 0; i < 7; i++) {
       const iso = toIsoDate(addDays(monday, i));
-      if (iso > todayIso) delete weekPlanMap[iso];
+      if (iso > todayIso) {
+        // Tehdyksi merkityt osat säilyvät, muut lasketaan taas uudelleen.
+        const kept = doneEntriesOn(iso);
+        if (kept.length) weekPlanMap[iso] = kept;
+        else delete weekPlanMap[iso];
+      }
     }
     saveWeekLockMap(weekLockMap);
     saveWeekPlanMap(weekPlanMap);
@@ -2714,7 +2761,7 @@
     const todayIso = toIsoDate(today);
     if (!isDayLocked(todayIso)) {
       const { perDay } = computeWeekAllocation();
-      weekPlanMap[todayIso] = planSnapshot(perDay[todayIso]);
+      weekPlanMap[todayIso] = doneEntriesOn(todayIso).concat(planSnapshot(perDay[todayIso]));
     }
     const cutoff = toIsoDate(addDays(today, -WEEKPLAN_KEEP_DAYS));
     Object.keys(weekPlanMap).forEach((iso) => {
@@ -4168,22 +4215,30 @@
         // Menneet päivät ja lukitun viikon päivät tallennetusta
         // tilannekuvasta, muut lasketusta suunnitelmasta.
         const fromSnapshot = isPast || dayLocked;
-        const itemByKey = fromSnapshot ? new Map(allItems.map((it) => [itemKey(it.courseId, it), it])) : null;
+        const itemByKey = new Map(allItems.map((it) => [itemKey(it.courseId, it), it]));
+        // idx = paikka weekPlanMapin listassa (vain tallennetuilla laatikoilla).
+        const fromStored = (e, idx) => {
+          const it = itemByKey.get(e.k);
+          const st = it ? getStatus(it) : null;
+          return {
+            item: it || { courseName: e.course || "", color: e.color || "#3b82f6", title: e.title || "" },
+            title: it ? displayTitle(it) : e.title || "",
+            hours: e.h || 0,
+            key: e.k,
+            real: !!it,
+            partDone: !!e.done,
+            done: st === "tehty" || st === "ei-tehda" || !!e.done,
+            idx,
+          };
+        };
+        // Lukitsemattoman päivän (tänään ja tulevat) tehdyt osat tallennetusta,
+        // loput lasketusta suunnitelmasta.
         const entries = fromSnapshot
-          ? (weekPlanMap[iso] || []).map((e) => {
-              const it = itemByKey.get(e.k);
-              const st = it ? getStatus(it) : null;
-              return {
-                item: it || { courseName: e.course || "", color: e.color || "#3b82f6", title: e.title || "" },
-                title: it ? displayTitle(it) : e.title || "",
-                hours: e.h || 0,
-                key: e.k,
-                real: !!it,
-                partDone: !!e.done,
-                done: st === "tehty" || st === "ei-tehda" || !!e.done,
-              };
-            })
-          : (perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours, key: itemKey(e.item.courseId, e.item), real: true }));
+          ? (weekPlanMap[iso] || []).map(fromStored)
+          : (weekPlanMap[iso] || [])
+              .map((e, idx) => (e.done ? fromStored(e, idx) : null))
+              .filter(Boolean)
+              .concat((perDay[iso] || []).map((e) => ({ item: e.item, title: displayTitle(e.item), hours: e.hours, key: itemKey(e.item.courseId, e.item), real: true })));
         // Lukitun viikon tulevat päivät: laatikoita voi vetää päivästä toiseen.
         // Menneet ja lukitut päivät ovat tallennettuja: niiden välillä voi
         // siirtää laatikoita vapaasti (myös takaisin menneille päiville).
@@ -4233,8 +4288,9 @@
             chip.classList.add("past-deadline");
             chip.title = e.item.courseName + ": tämä päivä on määräajan (" + fmtShort(parseDate(effDate(e.item))) + ") jälkeen";
           }
-          if (fromSnapshot) {
-            // Pikamerkintä: tämä osa tehty.
+          if (e.real || e.idx != null) {
+            // Pikamerkintä: tämä osa tehty (myös tulevilla päivillä, jos työn
+            // tekee etukäteen).
             const check = document.createElement("button");
             check.type = "button";
             check.className = "chip-check" + (e.partDone ? " on" : "");
@@ -4242,7 +4298,8 @@
             check.title = e.partDone ? "Poista tehty-merkintä tältä osalta" : "Merkitse tämä osa tehdyksi";
             check.onclick = (ev) => {
               ev.stopPropagation();
-              setEntryPartDone(iso, entryIdx, !e.partDone);
+              if (e.idx != null) setEntryPartDone(iso, e.idx, !e.partDone);
+              else markPlannedEntryDone(iso, e);
               renderWeek();
             };
             chip.appendChild(check);
@@ -4256,7 +4313,7 @@
             tm.lastChild.textContent = fmtDuration(getSpentMinutes(e.key));
             chip.appendChild(tm);
           }
-          chip.addEventListener("click", () => openChipEditor({ iso, idx: entryIdx, entry: e, editable: dayLocked || isPast, fromSnapshot }));
+          chip.addEventListener("click", () => openChipEditor({ iso, idx: e.idx != null ? e.idx : entryIdx, entry: e, editable: dayLocked || isPast, fromSnapshot: e.idx != null }));
           col.appendChild(chip);
         });
         if (!entries.length && !isPast) {

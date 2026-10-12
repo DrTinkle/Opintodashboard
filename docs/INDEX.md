@@ -314,7 +314,7 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     lukittu päivä), joten laatikon voi siirtää myös takaisin menneelle
     päivälle. Menneen päivän tekemättä jäänyt laatikko näkyy keltaisella
     katkoviivalla. Lukituksen avaus poistaa viikon tulevien
-    päivien tilannekuvat.
+    päivien tilannekuvat, paitsi tehdyksi merkityt osat.
   - **Laatikon muokkaus** (`openChipEditor()`): lukitun tai menneen päivän laatikon
     tunteja voi muuttaa (`setLockedEntryHours()`) ja sen voi jakaa kahtia
     (`splitLockedEntry()`). Tallennetun laatikon (lukittu tai mennyt päivä)
@@ -324,7 +324,15 @@ vientilinkki. Linkin `authtoken`-parametri on salainen.
     käsin syötetyn prosentin) ja Avoin-tila muuttuu Työn alla -tilaksi.
     Tehdyt osat eivät kuulu `preUsed`-summaan, koska ne ovat jo
     prosentissa. Määräajan jälkeiselle päivälle siirretty laatikko näkyy
-    katkoviivalla.
+    katkoviivalla. ✓ toimii myös lukitsemattoman viikon tänään- ja
+    tulevalle päivälle (etukäteen tehty työ): `markPlannedEntryDone()`
+    tallentaa laatikon `done: true` -merkittynä `weekplan_v1`:een, ja
+    `computeWeekAllocation()` vähentää tehdyt tunnit päivän kapasiteetista
+    (`doneHoursOn()`) ja lisää ne viikon tahtiin. Tehtävän loput tunnit
+    suunnitellaan niiden ympärille. Merkinnän poisto poistaa tallennetun
+    laatikon. Tekemättä jäänyt (ei ✓) menneen päivän laatikko ei vähennä
+    jäljellä olevaa työtä, vaan sen tunnit suunnitellaan uudelleen
+    tuleville päiville.
   - **Ajastin** (`timelog_v1`): yksi ajastin kerrallaan, käynnistys
     pysäyttää edellisen. Käytetty aika näkyy laatikon ikkunassa (myös
     prosentteina Arviosta) ja Työn alla -rivin "jäljellä"-tekstissä.

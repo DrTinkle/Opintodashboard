@@ -186,6 +186,7 @@ Ajastin (1620-1648): `getSpentMinutes(key)`, `runningTimerKey()`,
 | 2468 | `weekMondayIso(d)` | Päivän viikon maanantai |
 | 2472 | `isWeekLocked(mondayIso)` | |
 | 2477 | `isDayLocked(iso)` | Lukitun viikon päivä tänään tai myöhemmin |
+| 2480 | `doneHoursOn(iso)` / `doneEntriesOn(iso)` | Päivän tehdyksi merkityt (✓) tunnit ja laatikot `weekPlanMap`:ista, vähentävät kapasiteettia ja kuluttavat tahtia |
 | 2480 | `getLockedPlan()` | `{lockedDays, preUsed}`: lukitut päivät ja niille varatut tunnit (ei tehtyjä osia) |
 | 2499 | `lockWeek(mondayIso)` | Tallentaa viikon näkyvän suunnitelman |
 | 2584 | `unlockWeek(mondayIso)` | Poistaa viikon tulevat tilannekuvat |
@@ -193,7 +194,8 @@ Ajastin (1620-1648): `getSpentMinutes(key)`, `runningTimerKey()`,
 | 2521 | `moveLockedEntry(from, idx, to)` | Raahaus tallennettujen päivien välillä, yhdistää saman tehtävän |
 | 2536 | `setLockedEntryHours(iso, idx, h)` | Laatikon tunnit |
 | 2544 | `splitLockedEntry(iso, idx)` | Jako kahtia |
-| 2556 | `setEntryPartDone(iso, idx, done)` | Osan tehty-merkintä |
+| 2556 | `setEntryPartDone(iso, idx, done)` | Osan tehty-merkintä (lukitsemattomalla päivällä merkinnän poisto poistaa laatikon) |
+| 2556 | `markPlannedEntryDone(iso, entry)` | Lasketun laatikon merkintä tehdyksi (tänään tai tulevalla päivällä), tallentaa sen `done: true` |
 | 2567 | `recomputeProgressFromParts(key, item)` | Valmius % tehdyistä osista, Avoin → Työn alla |
 | 2602 | `recordTodayPlan()` | Tallentaa tämän päivän (jos ei lukittu), karsii yli 180 pv vanhat |
 | 3913 | `renderWeek()` | Piirtää viikkonäkymän: asetukset, varoitukset, lukituspalkki, päiväsarakkeet, laatikot, raahaus, ✓, ajastin |
